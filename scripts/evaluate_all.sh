@@ -3,6 +3,8 @@
 # then score HumanEvalFix by running the tests. Run on the GPU VM: execution.py runs model-written code.
 #   bash scripts/evaluate_all.sh            # all ten models
 #   bash scripts/evaluate_all.sh M0 M2      # selected models
+#   bash scripts/evaluate_all.sh M2_s43 M2_s44 M5_s43 M5_s44 M8_s43 M8_s44   # extra-seed adapters
+# M0 is the untuned base model, zero-shot (research decision, RESEARCH_LOG #27).
 set -euo pipefail
 (( BASH_VERSINFO[0] >= 4 )) || { echo "needs bash >= 4 (associative arrays)"; exit 1; }
 cd "$(dirname "$0")/.."
@@ -13,15 +15,16 @@ MODELS=(${MODELS[@]})
 mkdir -p results/predictions results/scores
 
 for m in "${MODELS[@]}"; do
+  cell="${m%%_s*}"   # M2_s43 -> M2
   adapter=()
   if [[ "$m" != "M0" ]]; then
     adapter=(--adapter "results/runs/$m/adapter")
     [[ -d "results/runs/$m/adapter" ]] || { echo "== $m: no adapter, skipping"; continue; }
   fi
   echo "== $m: CodeXGLUE ($(date -Is))"
-  python src/evaluator.py --bits "${BITS[$m]}" "${adapter[@]}" --run_name "$m" --benchmark codexglue --score
+  python src/evaluator.py --bits "${BITS[$cell]}" "${adapter[@]}" --run_name "$m" --benchmark codexglue --score
   echo "== $m: HumanEvalFix ($(date -Is))"
-  python src/evaluator.py --bits "${BITS[$m]}" "${adapter[@]}" --run_name "$m" --benchmark humanevalfix
+  python src/evaluator.py --bits "${BITS[$cell]}" "${adapter[@]}" --run_name "$m" --benchmark humanevalfix
   python src/execution.py results/predictions/"${m}"_humanevalfix_*.jsonl \
     --per_sample_out "results/scores/${m}_humanevalfix_per_sample.jsonl" > "results/scores/${m}_humanevalfix.json"
   cat "results/scores/${m}_humanevalfix.json"

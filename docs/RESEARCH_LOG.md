@@ -319,12 +319,20 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Tests:** evaluator end to end on CPU with the tiny model (M0 on CodeXGLUE with scoring; adapter on HumanEvalFix → `execution.py` scores it: 0 %, as expected for a random model). Scripts tested in a `bash:5.2` container with a stub `python` that prints commands: correct bits/rank per cell, skip logic, dry-run paths, M0 without adapter; macOS bash 3.2 is refused with a clear message.
 - **Pipeline status:** data → training → inference → metrics → test harness → run scripts are all implemented. Only the analysis scripts (Pareto plots, LaTeX tables, statistical tests) remain, and they need real results first.
 
+### 27. Decisions: 3 seeds for the r = 16 column; M0 zero-shot ✅
+- **User decision:** "go with 3 seeds and keep M0 zero-shot".
+- **Seeds:** **M2, M5, M8** (the r = 16 column: 4-bit / 8-bit / 16-bit at fixed rank, isolating the main factor, bit-width) are trained with **seeds 42, 43, 44**. All other cells use 42. **The data split stays seed 42 for every run**, so all seeds see identical train/validation/test data. The training seed varies LoRA initialisation, dropout and data order (`seed` + `data_seed`). Inference is greedy, so it doesn't depend on the seed.
+- **Cost:** +6 training runs (~2–3 GPU-h each → ~+12–18 GPU-h) and +6 evaluations; total roughly 85–120 GPU-h (~$100–145 on AWS g5.2xlarge), still inside the appeal's estimate range and the credit.
+- **Statistics this enables (analysis phase):** mean ± SD over 3 seeds for M2/M5/M8; paired per-sample tests between bit-widths on the same test items (McNemar for EM, syntax validity and Pass@1; Wilcoxon signed-rank + Cliff's δ / Vargha–Delaney A12 for continuous scores), with seed variance as a reference for "meaningful" differences.
+- **M0:** stays **zero-shot** (the plan's design; already implemented): the same instruction prompt as the fine-tuned models, no examples. It's framed as the untuned floor.
+- **Scripts:** `SEEDS="43 44" bash scripts/run_matrix.sh M2 M5 M8` → `results/runs/<cell>_s<seed>`; seed 42 keeps the plain names (M2, M5, M8). `evaluate_all.sh` accepts `M2_s43` etc. and maps them to the cell's bit-width. Tested in a bash 5 container.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
 1. ~~Pass@k~~ → resolved by HumanEvalFix Pass@1 (#20).
-2. Multiple seeds for a subset of configs (statistical testing)?
-3. M0: zero-shot or few-shot?
+2. ~~Multiple seeds~~ → 3 seeds (42/43/44) for M2, M5, M8 (#27).
+3. ~~M0~~ → zero-shot (#27).
 4. Phase 0 reproduction: confirm Tier A list once artifact availability is checked.
 5. GPU platform: **AWS A10G** if the appeal is approved; **RunPod RTX 4090 (backlog)** only if denied (#23).
 7. ~~Other HumanEvalPack languages~~ → all six added (#22).

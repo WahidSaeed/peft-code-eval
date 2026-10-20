@@ -26,7 +26,9 @@ Replication package for an MEng thesis (GISMA University of Applied Sciences, Be
 | **8-bit int8** | M4 | M5 | M6 |
 | **16-bit bf16 (LoRA)** | M7 | M8 | M9 |
 
-Plus **M0** (untuned base model) and a **naive-copy** reference (output = buggy input).
+Plus **M0** (untuned base model, **zero-shot**) and a **naive-copy** reference (output = buggy input).
+
+**Seed variance:** the r = 16 column (**M2, M5, M8**) is trained with **3 seeds (42, 43, 44)**, so the bit-width comparison comes with mean ± SD and paired statistical tests. Other cells use seed 42. The data split is fixed (seed 42) for every run.
 Fixed: α = 2r, all linear layers adapted (q, k, v, o, gate, up, down), LoRA dropout 0.05, LR 2e-4 (cosine, 3% warmup), batch 4 × grad-accum 4, 3 epochs, max length 512, paged AdamW (32-bit) for every bit-width, grad-norm clip 0.3, seed 42.
 
 | r | Trainable params | % of 6.74B | Adapter size (bf16) |
@@ -101,7 +103,9 @@ Full experiment on the GPU machine (bash ≥ 4):
 ```bash
 DRY_RUN=50 bash scripts/run_matrix.sh M1   # 1. dry run: checks 4-bit loading, VRAM and energy logging
 bash scripts/run_matrix.sh                 # 2. train M1–M9 (resumable: finished cells are skipped)
-bash scripts/evaluate_all.sh               # 3. predictions + scores for M0–M9
+SEEDS="43 44" bash scripts/run_matrix.sh M2 M5 M8      # 3. extra seeds for the r = 16 column
+bash scripts/evaluate_all.sh               # 4. predictions + scores for M0–M9
+bash scripts/evaluate_all.sh M2_s43 M2_s44 M5_s43 M5_s44 M8_s43 M8_s44
 ```
 
 Outputs: `results/train_log.csv`, `results/eval_log.csv` (throughput, TTFT, inference VRAM, energy, CodeXGLUE EM/CodeBLEU/syntax), `results/predictions/*.jsonl`, `results/scores/*` (HumanEvalFix Pass@1 per language, all and clean).
