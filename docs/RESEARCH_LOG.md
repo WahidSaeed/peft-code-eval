@@ -383,7 +383,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   1. Deterministic: differences between M0–M9 come from bit-width and rank, not sampling noise. This is required for the paired per-item tests (McNemar, Wilcoxon).
   2. Inference cost: sampled pass@10 would multiply evaluation compute about 10 times.
   3. Resource metrics (latency, VRAM, energy) depend on output length, and greedy keeps lengths fixed for a given model and input.
-  4. Convention for CodeXGLUE refinement and a realistic use case (a developer looks at one suggested fix).
+  4. ~~Convention for CodeXGLUE refinement~~ **Corrected in #32:** the official CodeXGLUE refinement baseline uses **beam search (beam size 5)**, not greedy. What remains of this point is the use case: a developer looks at one suggested fix.
   - *Threats to validity:* greedy Pass@1 is a lower bound on capability. It is not directly comparable to pass@10 with sampling (Li et al.; Vallecillos-Ruiz et al.) or to HumanEvalFix's original pass@1 (estimated from 20 samples at T = 0.2). Quantization can flip near-tied tokens, so single-item outcomes are noisy; seeds and paired tests address this at the aggregate level. Batched left-padding can shift greedy outputs slightly, so **batch size is fixed at 8 for every evaluation run** (`evaluate_all.sh` uses the evaluator default).
 - **Base-model sensitivity check** (one Base run, about 3 GPU-h): offered, not adopted. The plan's Instruct model stays.
 
@@ -401,7 +401,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 | **Vallecillos-Ruiz et al., ICSME 2026** (#29) | Instruct 6.7B | repair: HumanEval-Java, D4J | pass@10, T = 0.1 | (#29) |
 
 - **Findings:**
-  1. **Greedy Pass@1 is the standard for DeepSeek-Coder on generation benchmarks** (the official report, Magicoder/EvalPlus, StarCoder2's HumanEval section).
+  1. **Greedy Pass@1 is the standard for DeepSeek-Coder on code *generation* benchmarks** (the official report, Magicoder/EvalPlus, StarCoder2's HumanEval section). ⚠️ This is **not** a precedent for our task, which is repair (see #32).
   2. **For HumanEvalFix, the standard is *sampled* pass@1** (n = 20, T = 0.2), not greedy and not pass@10. The only published HumanEvalFix numbers for our exact model (StarCoder2 Table 12, avg 42.1) use that protocol.
   3. **Repair papers on Java benchmarks mostly use pass@10 / plausible-patch counts** (Li; Machácek; Vallecillos-Ruiz). Only PAFT uses pass@1, and it samples.
   4. No paper found that uses DeepSeek-Coder-6.7B with greedy Pass@1 on a repair benchmark.
@@ -412,6 +412,29 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - max_new_tokens.
 - **If sampling is adopted** (open discussion from #30), the literature points to **sampled pass@1 with n = 20, T = 0.2 on HumanEvalFix** (comparable to StarCoder2/OctoPack), not pass@10 (that is the Java-repair convention on HumanEval-Java/Defects4J, which we don't use).
 - ❓ Still open: greedy only vs greedy + sampled subset, and whether to run M0 once with the OctoPack protocol as a harness check.
+
+### 32. Correction: greedy decoding has no precedent on our repair benchmarks ⚠️ (decision ❓)
+- **User challenge:** "Greedy Pass@1 is standard for DeepSeek-Coder on code generation, but we have code repairing, right?" Correct. The generation precedent does not carry over to repair. I had used it as support for greedy decoding.
+- **Verified conventions on the two benchmarks we actually use:**
+
+| Benchmark | Established protocol | Source |
+|---|---|---|
+| CodeXGLUE code refinement (medium) | **Beam search, beam size 5**; EM (primary), BLEU, CodeBLEU | official CodeXGLUE baseline scripts (`--beam_size 5`, microsoft/CodeXGLUE, Code-Code/code-refinement) |
+| HumanEvalFix | **Sampled pass@1, n = 20, T = 0.2** | OctoPack protocol, used by StarCoder2 Table 12 (our exact model: avg 42.1) |
+| (not ours) HumanEval-Java / Defects4J / QuixBugs | pass@10 / plausible-patch counts | Li et al.; Machácek et al.; Vallecillos-Ruiz et al. |
+
+- **Consequence:** greedy decoding departs from the established protocol on **both** of our benchmarks. Its justification must rest on **methodological grounds only**:
+  - determinism for paired per-item tests across M0–M9;
+  - one fixed decoding configuration for the latency, VRAM and energy measurements;
+  - inference cost.
+
+  Comparability with published numbers would then be lost on both benchmarks and must be stated as a threat to validity.
+- **Correction to entry 30, point 4:** the claim "greedy is the convention for CodeXGLUE refinement" was wrong; it is beam search (5).
+- **Note:** beam search is deterministic too, so beam 5 on CodeXGLUE would keep the paired tests valid while matching the benchmark's convention. Its cost: higher KV-cache memory and slower decoding (both affect the RQ3 inference measurements, so those would need one fixed, declared decoding configuration).
+- ❓ Options for discussion with the user (no decision yet):
+  - **A.** Greedy everywhere, as a declared deviation from both benchmarks' conventions.
+  - **B.** Each benchmark's own convention: beam 5 on CodeXGLUE, sampled pass@1 (n = 20, T = 0.2) on HumanEvalFix.
+  - **C.** Greedy as the primary protocol for all models, plus the benchmark conventions on a subset (M0 + M2/M5/M8).
 
 ---
 
