@@ -439,6 +439,25 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 ### 33. Briefing document for the decoding-protocol decision ✅
 - The user found #30–#32 confusing and asked for a single self-contained summary to discuss in NotebookLM. Written as `docs/decoding_protocol_briefing.md`. It covers the study, plain-language definitions (greedy, beam, sampling, Pass@1 vs pass@10), the verified literature, the pros and cons of greedy, options A/B/C, the remaining uncertainties, questions to explore, and source links. The decision remains ❓.
 
+### 34. Discussion: training on Java (CodeXGLUE) but evaluating on 6 languages (HumanEvalFix) ❓
+- **User question:** if we train only on CodeXGLUE Java, how can we evaluate on other languages?
+- **What HumanEvalFix actually measures in this design:** **transfer / forgetting, not in-task accuracy.** The base model already repairs code in all six languages; StarCoder2 reports untuned DeepSeek-Coder-6.7B-Instruct at 42.1 avg pass@1 (#31). The adapters change that ability. HumanEvalFix measures whether the change helps, does nothing, or harms (catastrophic forgetting), and whether **bit-width and rank change how much**. This was the intent of RQ1b in #20.
+- ⚠️ **Even HumanEvalFix-Java is out-of-distribution.** Training data is abstracted (`VAR_1`, `METHOD_1`), space-tokenised, single methods, ≤ 512 tokens, with one fixed instruction. HumanEvalFix has real identifiers, whole programs with imports, longer inputs (Java mean 582 tokens, 102/164 over 512, #20), example tests in the prompt, and a different instruction. So the design separates two shifts:
+  1. **format shift only:** CodeXGLUE Java → HumanEvalFix Java;
+  2. **format + language shift:** → Python, C++, Go, Rust, JS.
+- ⚠️ **Framing problem found:** #20 said HumanEvalFix Pass@1 "replaces the Pass@k promise in RQ1". That conflates two things: in-task correctness and generalisation. Proposed framing:
+  - **RQ1** (in-task repair quality) = CodeXGLUE EM / CodeBLEU / syntax validity;
+  - **RQ1b** (generalisation and forgetting) = HumanEvalFix Pass@1 relative to M0.
+
+  Consequence: the thesis has **no test-based functional correctness on the training distribution** (CodeXGLUE has no tests). This must be stated as a limitation.
+- **Plausible outcome:** fine-tuned models score **below M0** on HumanEvalFix. Prior evidence: Machácek et al. (ICSME 2025) found fine-tuning lowered repair scores, attributed to differences between training data and benchmarks (#28/#31). This would be a legitimate finding; the interesting part is whether 4-bit vs 16-bit or r = 8 vs 32 forget more.
+- ⚠️ **Floor-effect risk:** if every adapter collapses on HumanEvalFix (e.g. emits abstracted `VAR_1` tokens or truncated code), all models score near 0 and bit-width/rank cannot be compared. **Mitigation:** right after the dry run, evaluate M0 and the first adapter on a HumanEvalFix sample and inspect the outcome categories (compile error vs wrong logic vs abstracted tokens) before running the full matrix.
+- **Alternatives considered:**
+  - **(a)** Keep the design and reframe as above.
+  - **(b)** Add multilingual repair training data (e.g. CommitPackFT, used by OctoPack): a different study, much bigger.
+  - **(c)** Find a Java repair test set with unit tests matching the training format: none known with abstracted identifiers, so it would still be OOD.
+- ❓ Awaiting user discussion. The assistant's recommendation is (a).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
