@@ -27,6 +27,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | Phase 0: reproduce Tier-A papers | ❓ | Artifacts checked (#28): Li ✅ full, Huang ✅ code+data, Wei ❌ none; scope decision pending |
 | Pass@k in RQ1 (CodeXGLUE has no tests) | ✅ | Resolved: Pass@1 on HumanEvalFix (#20) |
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
+| Novelty check + positioning table | ✅ | No prior bit-width × rank study for APR found (#29) |
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
 | Learning path | ✅ | `docs/LEARNING_PATH.md` |
 | RunPod fallback (RTX 4090, $0.90/h) | 📋 backlog | Only if AWS denies the appeal (#23) |
@@ -347,6 +348,28 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   2. **Huang et al. (secondary):** reproduce one LoRA cell on a ≤7B model on HumanEval-Java after checking the Drive data size.
   3. **Wei et al.:** no artifact, so it cannot be reproduced. Either re-implement one int8 PTQ data point, or cite it (plus the 2025 replication) as related work only.
 - ❓ Waiting on the user to pick the scope.
+
+### 29. Novelty check and positioning table ✅
+- **Question (user):** is it a problem that our study is close to Li et al.? **Answer:** no. Close prior work is expected and helps credibility, as long as the difference is stated explicitly. The user asked for a targeted search for any study that already does bit-width × rank for APR, plus a positioning table.
+- **Search (2026-10-21):** web searches combining QLoRA / quantization / bit-width / LoRA rank / energy with program repair, HumanEvalFix and DeepSeek-Coder; abstracts and full texts read for every close hit.
+- **Result:** **no study found that varies training-time quantization bit-width together with LoRA rank for program repair, or that measures training and inference energy for quantized PEFT on repair.** The closest work is below.
+
+| Study | Task | Model(s) | Fine-tuning | Quantization | Rank varied? | Resources measured | Gap relative to ours |
+|---|---|---|---|---|---|---|---|
+| **Li et al., ASE 2024** (arXiv 2406.05639) | APR (Java) | CodeLlama-7B/13B, Llama-2-7B, **DeepSeek-Coder-6.7B-Base** | LoRA, IA3, prefix, p-tuning vs full FT | none (bf16) | small sweep (rank 16 "enough") | peak training memory | No quantization; no energy or latency |
+| **Huang et al., TSE 2025** (10.1109/TSE.2025.3532759) | APR (Java) | InCoder, CodeGeeX2, CodeGen25, StarCoder(2), CodeLlama-13B/70B | LoRA, AdaLoRA, IA3 vs full FT | 8-bit used **as a tool** to fit models, not compared | no | memory and time | Bit-width not a factor; no energy |
+| **Vallecillos-Ruiz et al., ICSME 2026** (arXiv 2606.27205) | APR (HumanEval-Java, Defects4J) | 6 models incl. **deepseek-coder-6.7b-instruct** | **none** (off-the-shelf models) | 13 post-training configs (AQLM, AWQ, bnb4, HQQ, Quanto; weights and KV cache) | n/a | inference time, energy (NVML), memory; Pareto | **Inference only, no fine-tuning.** Finds quantization cuts memory but **increases** inference time and energy |
+| **Weyssow et al., TOSEM 2025** (10.1145/3714461) | code **generation** (Python) | CodeLlama-7B–34B, CodeGen2, CodeT5+ | LoRA, IA3, prompt, prefix, QLoRA | QLoRA 4-bit and 8-bit | **no** (fixed r = 16, rank sensitivity left as future work) | peak memory only | Not repair; no rank axis; no energy |
+| **Machácek et al., ICSME 2025** (arXiv 2507.19909) | APR (QuixBugs, Defects4J, HumanEval-Java) | 6 code LLMs | none vs full FT vs LoRA/IA3 | none | no | — | No quantization or resources |
+| **Wei et al., ESEC/FSE 2023** (arXiv 2303.05378) | code generation | CodeGen, InCoder, CodeT5 | none | post-training int8 (dynamic/static) | n/a | latency, size, carbon estimate | Not repair; no PEFT |
+| **Yang et al., 2026, PAFT** (arXiv 2604.03113) | APR | DeepSeek-Coder-6.7B | new fine-tuning objective | 4-bit NF4 QLoRA **as a tool** | no | none | Bit-width not a factor |
+| **Le-Cong et al., ICSE 2026, FLAMES** (arXiv 2410.16655) | APR | 1B–7B LLMs | none | discussed as an inadequate fix for memory | n/a | memory | Decoding method, not PEFT |
+| **This thesis** | **APR**: CodeXGLUE Java + HumanEvalFix (6 languages) | DeepSeek-Coder-6.7B-Instruct | LoRA, 3 seeds on the r = 16 column | **training-time** NF4 4-bit vs LLM.int8() vs bf16 | **yes** (8/16/32) | training VRAM, time and energy; inference VRAM, TTFT, decode speed and energy | — |
+
+- **Draft novelty statement (for the thesis introduction):** "Prior work compares PEFT methods for program repair at full precision (Li et al.; Huang et al.), uses quantization only to fit larger models, or quantizes off-the-shelf models at inference time (Vallecillos-Ruiz et al.). To our knowledge, this is the first study to vary training-time quantization bit-width jointly with LoRA rank for program repair and to measure the resulting trade-off across the full lifecycle: repair accuracy, training cost, and inference cost (memory, latency, energy)."
+- ⚠️ **Vallecillos-Ruiz et al. (ICSME 2026) must be cited and discussed.** It is the closest work on the resource side and uses **the same model** (deepseek-coder-6.7b-instruct). Its finding that quantized inference is *slower and uses more energy* despite smaller memory is a hypothesis our RQ3 inference measurements (bnb NF4 / int8 vs bf16, A10G) can confirm or refute for **fine-tuned** models. It also reports pass@10 with temperature 0.1 on GH200 GPUs, so absolute numbers are not directly comparable to our greedy Pass@1 on A10G. Replication package: Zenodo 10.5281/zenodo.20847818.
+- ⚠️ **Scope of the claim:** "to our knowledge" is bounded by this search (web search plus the papers above). Before submission, re-run the search and check the PEFT systematic review by Afrin et al. (arXiv 2504.21569, list of 28 included studies in its artifact) for anything missed.
+- **Not added to the reproduction plan:** these papers are positioning only. Phase 0 scope is still decision #4.
 
 ---
 
