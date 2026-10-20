@@ -27,6 +27,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
 | Learning path | ✅ | `docs/LEARNING_PATH.md` |
+| Public GitHub repo | ✅ | https://github.com/WahidSaeed/peft-code-eval (#18) |
 
 ---
 
@@ -195,6 +196,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - Day-to-day console and CLI access moved from the root account to an IAM user with MFA (passkey). Root is kept for billing and emergencies.
 - Gotcha: switching an existing `aws login` profile from root to an IAM user asks an overwrite question, which fails in a non-interactive shell ("EOF when reading a line"). `yes | aws login` works.
 - Both cost controls promised in the appeal are in place. GPU quota still 0, waiting for AWS's answer.
+
+### 18. Public GitHub repository ✅
+- **User request:** make a public GitHub repo.
+- **Repo:** https://github.com/WahidSaeed/peft-code-eval (public, branch `main`, MIT license, with topics).
+- **Before publishing:** account-level cloud details (account and case IDs, IAM user, email, other-project spending) and the AWS appeal were moved to `docs/private/` (git-ignored). This log keeps redacted summaries with the same research-relevant facts. A secret scan of staged files was clean.
+- **Not published:** `data/` (regenerated deterministically by `data_loader.py`; the dataset stays with its original distributor), `results/`, checkpoints, the research plan file and the LinkedIn drafts.
+- Added `README.md` (RQs, design matrix, findings so far, quick start, data provenance), `.gitignore`, `LICENSE`.
+- **Workflow from now on:** this log is public, so private/ops details go to `docs/private/OPS_LOG.md` and research-relevant facts go here.
 
 ---
 
