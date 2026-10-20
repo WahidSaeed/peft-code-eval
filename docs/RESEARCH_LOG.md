@@ -371,9 +371,9 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - ⚠️ **Scope of the claim:** "to our knowledge" is bounded by this search (web search plus the papers above). Before submission, re-run the search and check the PEFT systematic review by Afrin et al. (arXiv 2504.21569, list of 28 included studies in its artifact) for anything missed.
 - **Not added to the reproduction plan:** these papers are positioning only. Phase 0 scope is still decision #4.
 
-### 30. Decisions: Instruct model and greedy Pass@1 only (no pass@10) ✅
+### 30. Instruct model and greedy Pass@1: rationale ❓ (reopened for discussion, see #31)
 - **User question:** why Instruct instead of Base, and why greedy only? Both come from the research plan (§4 model; greedy inference in the inference-memory metric and the `evaluator.py` description).
-- **User decision on pass@10:** not added. "If we add pass@10 then our research will become very complicated and big." **Greedy Pass@1 stays the only execution metric.**
+- **User's initial view on pass@10:** not added. "If we add pass@10 then our research will become very complicated and big." The user then asked for a deeper discussion before deciding (#31), so this is **not yet a decision**.
 - **Justification for the methods chapter (Instruct):**
   1. The zero-shot M0 baseline is only meaningful for an instruction-following model. A Base model would fail on output format, not repair ability, and would inflate every fine-tuning gain.
   2. It matches the deployment scenario (adapting a code assistant on one GPU).
