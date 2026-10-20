@@ -28,6 +28,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
 | Learning path | ✅ | `docs/LEARNING_PATH.md` |
+| RunPod fallback (RTX 4090, $0.90/h) | 📋 backlog | Only if AWS denies the appeal (#23) |
 | Public GitHub repo | ✅ | https://github.com/WahidSaeed/peft-code-eval (#18) |
 
 ---
@@ -281,7 +282,8 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Cost estimate:** ~70–100 GPU-h → ~$65–90 plus storage. RunPod is real money, unlike the AWS credit.
 - **Storage:** the container disk is erased when the pod stops. Recommend a **network volume (~100 GB, EU data centre)** for the HF model cache, data, adapters and results; it persists independently of the pod, but pins the pod to that data centre's GPUs.
 - **Blockers (user actions):** RunPod balance is **$0.00**, so credits must be loaded before deploying; RunPod account MFA is not enabled (banner); an SSH public key is needed in Settings for terminal access.
-- **Methodology:** official M0–M9 runs must all use one GPU model. ❓ Platform decision: RunPod RTX 4090 now for everything, or RunPod for development/dry run only and AWS A10G for official runs if approved.
+- **Methodology:** official M0–M9 runs must all use one GPU model.
+- **User decision:** RunPod goes to the **backlog**. It's used **only if AWS denies the appeal**; then all runs (dry run + official) move to RunPod RTX 4090 with the config above. Nothing deployed, no credits loaded.
 
 ---
 
@@ -290,6 +292,6 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 2. Multiple seeds for a subset of configs (statistical testing)?
 3. M0: zero-shot or few-shot?
 4. Phase 0 reproduction: confirm Tier A list once artifact availability is checked.
-5. GPU platform: AWS A10G (if the appeal is approved) or RunPod RTX 4090 ($0.90/h), see #23.
+5. GPU platform: **AWS A10G** if the appeal is approved; **RunPod RTX 4090 (backlog)** only if denied (#23).
 7. ~~Other HumanEvalPack languages~~ → all six added (#22).
 6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis.
