@@ -387,6 +387,32 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - *Threats to validity:* greedy Pass@1 is a lower bound on capability. It is not directly comparable to pass@10 with sampling (Li et al.; Vallecillos-Ruiz et al.) or to HumanEvalFix's original pass@1 (estimated from 20 samples at T = 0.2). Quantization can flip near-tied tokens, so single-item outcomes are noisy; seeds and paired tests address this at the aggregate level. Batched left-padding can shift greedy outputs slightly, so **batch size is fixed at 8 for every evaluation run** (`evaluate_all.sh` uses the evaluator default).
 - **Base-model sensitivity check** (one Base run, about 3 GPU-h): offered, not adopted. The plan's Instruct model stays.
 
+### 31. Literature check: DeepSeek-Coder-6.7B with Pass@1 (input to the greedy vs sampling discussion) ✅ (decision ❓)
+- **User request:** check whether any paper uses DeepSeek-Coder-6.7B-Base or -Instruct with Pass@1. Protocols verified from full texts, not abstracts.
+
+| Paper | Variant | Task / benchmark | Metric and decoding (quoted or verified) | Reported numbers |
+|---|---|---|---|---|
+| **DeepSeek-Coder tech report** (Guo et al., 2024, arXiv 2401.14196) | Base and Instruct 6.7B | generation: HumanEval, MBPP | Pass@1, **greedy** ("We adopted a greedy search approach") | HumanEval-Py: Base 49.4, Instruct 78.6; multilingual avg 44.7 / 66.1; MBPP 60.6 / 65.4 |
+| **StarCoder2** (Lozhkov et al., 2024, arXiv 2402.19173), Table 12 | **Instruct 6.7B** | **repair: HumanEvalFix, 6 languages (our benchmark)** | Pass@1 **sampled**: "temperature of 0.2 to estimate pass@1 with 20 samples" (OctoPack protocol). The same paper uses greedy for HumanEval/MBPP | Py 44.9, JS 55.3, Java 52.2, Go 42.9, C++ 37.9, Rust 19.5; **avg 42.1** |
+| **Magicoder** (Wei et al., ICML 2024, arXiv 2312.02120) | Base 6.7B (fine-tuned), Instruct as baseline | generation: HumanEval(+), MBPP(+) | Pass@1, **greedy** ("we use greedy decoding to generate one sample") | MagicoderS-DS 76.8 HumanEval |
+| **Machácek et al., ICSME 2025** (arXiv 2507.19909) | Base 6.7B | repair: QuixBugs, HumanEval-Java, Defects4J | **10 patches per bug**, plausible if any passes (pass@10-style); decoding not stated; LoRA r = 8 / IA3, 1 epoch | No FT: 33/40, 107/163, 89/219; LoRA: 31/108/108 |
+| **PAFT** (Yang et al., 2026, arXiv 2604.03113) | "DS-Coder-6.7B", variant not stated | repair: Defects4J, HumanEval-Java | Pass@1 **sampled at T = 0.7**; **4-bit NF4 QLoRA, r = 32**, α = 16 | D4J pass@1 5.9 → 10.1 |
+| **Li et al., ASE 2024** (#28) | Base 6.7B | repair: HumanEval-Java, D4J, QuixBugs | pass@10 | (#28) |
+| **Vallecillos-Ruiz et al., ICSME 2026** (#29) | Instruct 6.7B | repair: HumanEval-Java, D4J | pass@10, T = 0.1 | (#29) |
+
+- **Findings:**
+  1. **Greedy Pass@1 is the standard for DeepSeek-Coder on generation benchmarks** (the official report, Magicoder/EvalPlus, StarCoder2's HumanEval section).
+  2. **For HumanEvalFix, the standard is *sampled* pass@1** (n = 20, T = 0.2), not greedy and not pass@10. The only published HumanEvalFix numbers for our exact model (StarCoder2 Table 12, avg 42.1) use that protocol.
+  3. **Repair papers on Java benchmarks mostly use pass@10 / plausible-patch counts** (Li; Machácek; Vallecillos-Ruiz). Only PAFT uses pass@1, and it samples.
+  4. No paper found that uses DeepSeek-Coder-6.7B with greedy Pass@1 on a repair benchmark.
+- ⚠️ **Implication: an external anchor for M0.** M0 (untuned Instruct, zero-shot, HumanEvalFix) can be checked against StarCoder2's 42.1 average and per-language numbers. This validates our harness, the way Phase 0 is meant to. Comparability caveats:
+  - greedy vs T = 0.2 sampled pass@1 (usually close, not identical);
+  - prompt wording: our `HEF_INSTRUCTION` vs the OctoPack/StarCoder2 instruct prompt;
+  - our 4 defective tasks are excluded in the clean subset;
+  - max_new_tokens.
+- **If sampling is adopted** (open discussion from #30), the literature points to **sampled pass@1 with n = 20, T = 0.2 on HumanEvalFix** (comparable to StarCoder2/OctoPack), not pass@10 (that is the Java-repair convention on HumanEval-Java/Defects4J, which we don't use).
+- ❓ Still open: greedy only vs greedy + sampled subset, and whether to run M0 once with the OctoPack protocol as a harness check.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
