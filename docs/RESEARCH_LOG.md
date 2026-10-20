@@ -371,6 +371,22 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - ⚠️ **Scope of the claim:** "to our knowledge" is bounded by this search (web search plus the papers above). Before submission, re-run the search and check the PEFT systematic review by Afrin et al. (arXiv 2504.21569, list of 28 included studies in its artifact) for anything missed.
 - **Not added to the reproduction plan:** these papers are positioning only. Phase 0 scope is still decision #4.
 
+### 30. Decisions: Instruct model and greedy Pass@1 only (no pass@10) ✅
+- **User question:** why Instruct instead of Base, and why greedy only? Both come from the research plan (§4 model; greedy inference in the inference-memory metric and the `evaluator.py` description).
+- **User decision on pass@10:** not added. "If we add pass@10 then our research will become very complicated and big." **Greedy Pass@1 stays the only execution metric.**
+- **Justification for the methods chapter (Instruct):**
+  1. The zero-shot M0 baseline is only meaningful for an instruction-following model. A Base model would fail on output format, not repair ability, and would inflate every fine-tuning gain.
+  2. It matches the deployment scenario (adapting a code assistant on one GPU).
+  3. HumanEvalFix is an instruction-style benchmark designed for instruct models.
+  - *Threat to validity:* Li et al. (ASE 2024) used DeepSeek-Coder-6.7B-**Base**, so absolute numbers are not directly comparable. The Instruct model's chat habits may interact with CodeXGLUE's abstracted, space-tokenised format; fine-tuning reduces but cannot fully isolate this.
+- **Justification for the methods chapter (greedy decoding):**
+  1. Deterministic: differences between M0–M9 come from bit-width and rank, not sampling noise. This is required for the paired per-item tests (McNemar, Wilcoxon).
+  2. Inference cost: sampled pass@10 would multiply evaluation compute about 10 times.
+  3. Resource metrics (latency, VRAM, energy) depend on output length, and greedy keeps lengths fixed for a given model and input.
+  4. Convention for CodeXGLUE refinement and a realistic use case (a developer looks at one suggested fix).
+  - *Threats to validity:* greedy Pass@1 is a lower bound on capability. It is not directly comparable to pass@10 with sampling (Li et al.; Vallecillos-Ruiz et al.) or to HumanEvalFix's original pass@1 (estimated from 20 samples at T = 0.2). Quantization can flip near-tied tokens, so single-item outcomes are noisy; seeds and paired tests address this at the aggregate level. Batched left-padding can shift greedy outputs slightly, so **batch size is fixed at 8 for every evaluation run** (`evaluate_all.sh` uses the evaluator default).
+- **Base-model sensitivity check** (one Base run, about 3 GPU-h): offered, not adopted. The plan's Instruct model stays.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
