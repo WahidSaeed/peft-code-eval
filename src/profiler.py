@@ -96,27 +96,30 @@ class GPUProfiler:
         self.tokens += tokens
 
     def __enter__(self):
-        torch.cuda.synchronize(self.device_index)
-        torch.cuda.reset_peak_memory_stats(self.device_index)
-        self.energy.start()
+        self.cuda = torch.cuda.is_available()  # False only for CPU smoke tests
+        if self.cuda:
+            torch.cuda.synchronize(self.device_index)
+            torch.cuda.reset_peak_memory_stats(self.device_index)
+            self.energy.start()
         self._t0 = time.perf_counter()
         return self
 
     def __exit__(self, *exc):
-        torch.cuda.synchronize(self.device_index)
+        if self.cuda:
+            torch.cuda.synchronize(self.device_index)
         duration = time.perf_counter() - self._t0
-        energy_wh = self.energy.stop()
+        energy_wh = self.energy.stop() if self.cuda else None
         self.results = {
             "duration_s": round(duration, 3),
-            "peak_vram_allocated_gib": round(torch.cuda.max_memory_allocated(self.device_index) / GIB, 3),
-            "peak_vram_reserved_gib": round(torch.cuda.max_memory_reserved(self.device_index) / GIB, 3),
+            "peak_vram_allocated_gib": round(torch.cuda.max_memory_allocated(self.device_index) / GIB, 3) if self.cuda else None,
+            "peak_vram_reserved_gib": round(torch.cuda.max_memory_reserved(self.device_index) / GIB, 3) if self.cuda else None,
             "samples": self.samples,
             "tokens": self.tokens,
             "samples_per_s": round(self.samples / duration, 3) if duration else None,
             "tokens_per_s": round(self.tokens / duration, 2) if duration else None,
             "energy_wh": round(energy_wh, 3) if energy_wh is not None else None,
             "energy_method": self.energy.method,
-            "gpu_name": torch.cuda.get_device_name(self.device_index),
+            "gpu_name": torch.cuda.get_device_name(self.device_index) if self.cuda else "cpu",
         }
         return False
 

@@ -17,7 +17,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | `src/data_loader.py` | ✅ | Tested on CodeXGLUE Medium |
 | `src/profiler.py` | ✅ (untested on GPU) | Compiles; needs GPU for a real test |
 | `src/metrics_se.py` | ✅ | Sanity-checked on ground truth |
-| `src/trainer.py` | ⏳ | Next |
+| `src/trainer.py` | ✅ (CPU smoke test) | GPU paths validated by the dry run (#25) |
 | `src/evaluator.py` | ⏳ | |
 | `src/execution.py` (HumanEvalFix Pass@1) | ✅ | 6 languages; clean subset canonical 100 % / buggy 0 % (#22) |
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
@@ -289,6 +289,22 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **User question:** should MBPP be added to the evaluation?
 - **Assessment:** MBPP is code *generation* (a function written from a short description), not repair. The RQs are about program repair, which CodeXGLUE (in-distribution) and HumanEvalFix (out-of-distribution, 6 languages, unit tests) already cover. MBPP would only serve a *capability-retention / forgetting* question (does quantized fine-tuning hurt general generation?), which is not in the plan. If that question were ever wanted, HumanEvalSynthesize (same 164 problems × 6 languages, same harness) would fit better than MBPP (Python only, new harness).
 - **User decision:** not added. "as you said our research is code fix not generation." The scope stays program repair only; generation benchmarks are out of scope.
+
+### 25. `src/trainer.py` ✅ (CPU smoke-tested; GPU paths pending)
+- **CLI:** `--bits {4,8,16} --rank R [--alpha A] --output_dir DIR [--run_name M1] [--max_steps N]` plus debugging flags (`--train_limit`, `--eval_limit`, `--no_eval`). α defaults to 2r.
+- **Model loading:** 4-bit = NF4 + double quantization, bf16 compute (QLoRA); 8-bit = LLM.int8(); 16-bit = bf16. For 4/8-bit, `prepare_model_for_kbit_training` (standard QLoRA recipe; casts norms to fp32 and enables gradient checkpointing); for 16-bit, gradient checkpointing + input grads. SDPA attention; `use_cache=False` during training.
+- **LoRA:** all linear layers `q,k,v,o,gate,up,down`, dropout 0.05, no bias.
+- **Hyperparameters fixed by the plan:** LR 2e-4, batch 4 × accumulation 4 (effective 16), 3 epochs, max length 512, seed 42.
+- **Hyperparameters the plan left open, chosen here (overridable, all recorded in `run_config.json`):**
+  - optimizer **paged AdamW 32-bit for every bit-width**, so the optimizer is never a confound (the plan said "Paged AdamW 8-bit / AdamW"); paging only engages under memory pressure;
+  - **cosine** schedule with **3 % warmup**; **grad-norm clip 0.3** (QLoRA paper default); weight decay 0;
+  - validation loss after **each epoch** (overfitting check across the 3 epochs); checkpoint per epoch (keep 1) for crash recovery; final adapter in `adapter/`.
+- **Profiling:** `GPUProfiler` wraps `trainer.train()`. Recorded: peak VRAM allocated and reserved, **static VRAM after model load** (weights + adapters, for RQ2), duration with and without evaluation time, samples/s, tokens/s (real non-pad tokens), energy (NVML), GPU name, library versions.
+- **Verified on CPU** with a tiny 2-layer Llama using DeepSeek's real tokenizer: full pipeline runs, adapter + `run_config.json` + CSV row written; initial loss 10.36 ≈ ln(32,022) = 10.37, as expected for an untrained model.
+- **Label masking verified on real data:** trained tokens are exactly `target + <|EOT|>` (3/3 examples); training starts right after `### Response:\n`; pad token `<｜end▁of▁sentence｜>` (32014) ≠ EOS `<|EOT|>` (32021), so padding can't hide the EOS.
+- ✅ **Learning-path exercise confirmed** (meta-device model, no weights loaded): DeepSeek-Coder-6.7B = LLaMA, 32 layers, hidden 4096, intermediate 11008, vocab 32,256, 6,740,512,768 params. LoRA trainable = 2,498,560 × r → **19.99M (0.297 %) / 39.98M (0.593 %) / 79.95M (1.186 %)** for r = 8/16/32; adapters 38 / 76 / 152 MB in bf16.
+- **Compatibility:** transformers 5 removed `warmup_ratio` (a float ratio now goes in `warmup_steps`); `trainer.py` detects which applies. `requirements.txt` now needs `transformers>=4.56` (for `dtype=`).
+- ⚠️ **Not testable without a GPU:** the 4-bit/8-bit loading (bitsandbytes is CUDA-only), the paged optimizer, VRAM and energy measurement. These are validated by the 50-step M1 dry run on the GPU.
 
 ---
 

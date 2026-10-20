@@ -1,7 +1,7 @@
 # Core deep learning stack (install the CUDA build of torch matching the GPU host)
 torch>=2.3
-transformers>=4.44
-peft>=0.12
+transformers>=4.56          # dtype= argument; 5.x also supported (warmup handled in trainer.py)
+peft>=0.13
 bitsandbytes>=0.43
 accelerate>=0.33
 datasets>=2.20

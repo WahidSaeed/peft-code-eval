@@ -2,7 +2,7 @@
 
 Replication package for an MEng thesis (GISMA University of Applied Sciences, Berlin): an empirical study of how **bit-width** (4-bit NF4 QLoRA, 8-bit, 16-bit bf16 LoRA) and **LoRA rank** (r ∈ {8, 16, 32}) trade off **correctness, GPU memory, speed and energy** when fine-tuning a large code model for Java bug fixing.
 
-> 🚧 **Work in progress.** Data pipeline and metrics are implemented and validated. Training and evaluation scripts are in progress. Results will be added as runs complete.
+> 🚧 **Work in progress.** Data pipeline, metrics, test harness and trainer are implemented and validated (trainer smoke-tested on CPU; GPU runs pending). The inference/evaluation script is next. Results will be added as runs complete.
 
 ## Research questions
 
@@ -27,7 +27,13 @@ Replication package for an MEng thesis (GISMA University of Applied Sciences, Be
 | **16-bit bf16 (LoRA)** | M7 | M8 | M9 |
 
 Plus **M0** (untuned base model) and a **naive-copy** reference (output = buggy input).
-Fixed: α = 2r, all linear layers adapted, LR 2e-4, batch 4 × grad-accum 4, 3 epochs, max length 512.
+Fixed: α = 2r, all linear layers adapted (q, k, v, o, gate, up, down), LoRA dropout 0.05, LR 2e-4 (cosine, 3% warmup), batch 4 × grad-accum 4, 3 epochs, max length 512, paged AdamW (32-bit) for every bit-width, grad-norm clip 0.3, seed 42.
+
+| r | Trainable params | % of 6.74B | Adapter size (bf16) |
+|---|---|---|---|
+| 8 | 19,988,480 | 0.297 % | 38 MB |
+| 16 | 39,976,960 | 0.593 % | 76 MB |
+| 32 | 79,953,920 | 1.186 % | 152 MB |
 
 ## Findings so far (metric validation)
 
@@ -47,7 +53,7 @@ src/
   metrics_se.py    tree-sitter syntax validity (with de-tokenisation), Exact Match, CodeBLEU
   execution.py     sandboxed test runner for HumanEvalFix Pass@1 (Python, Java, C++, Go, Rust, JS)
   profiler.py      peak VRAM, throughput, NVML energy, TTFT, trainable-parameter ratio, CSV logging
-  trainer.py       (in progress) PEFT training with --bits / --rank / --alpha
+  trainer.py       PEFT training for one matrix cell (--bits 4|8|16, --rank, --alpha) with profiling + CSV log
   evaluator.py     (planned) greedy batch inference
 configs/  scripts/  analysis/   (planned) run configs, matrix runner, Pareto plots and LaTeX tables
 docs/
@@ -77,6 +83,15 @@ python src/execution.py data/humanevalfix_*.jsonl --sanity buggy       # expect 
 The first Go/Rust run downloads `testify` (Go proxy) and `rand 0.7`, `regex`, `md5` (crates.io) into `~/.cache/peft-code-eval` (override with `HEF_CACHE`). JavaScript/162's `js-md5` package is replaced by a local shim built on Node's `crypto`.
 
 ⚠️ `execution.py` runs model-generated code. Score real predictions on a disposable machine or container.
+
+Training one matrix cell (GPU):
+
+```bash
+python src/trainer.py --bits 4 --rank 8 --run_name M1 --output_dir results/runs/M1                   # full run
+python src/trainer.py --bits 4 --rank 8 --run_name dry --output_dir results/runs/dry --max_steps 50  # dry run
+```
+
+Each run writes `adapter/`, `run_config.json` (all arguments, fixed hyperparameters, library versions, results) and appends one row to `results/train_log.csv` (peak VRAM allocated/reserved, static VRAM after load, duration with and without evaluation, samples/s, tokens/s, energy, losses, GPU name).
 
 Version note: `codebleu==0.7.0` requires `tree-sitter` 0.22.x, which in turn requires `tree-sitter-java` 0.21.x. The pins in `requirements.txt` are tested together.
 
