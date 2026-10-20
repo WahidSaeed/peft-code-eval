@@ -19,11 +19,12 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | `src/metrics_se.py` | ✅ | Sanity-checked on ground truth |
 | `src/trainer.py` | ⏳ | Next |
 | `src/evaluator.py` | ⏳ | |
+| `src/execution.py` (HumanEvalFix Pass@1) | ✅ | Canonical 100 % / buggy 0 % in Python and Java (#20) |
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
 | Phase 0: reproduce Tier-A papers | ❓ | Needs artifact availability check |
-| Pass@k in RQ1 (CodeXGLUE has no tests) | ❓ | Option: add QuixBugs-Java |
+| Pass@k in RQ1 (CodeXGLUE has no tests) | ✅ | Resolved: Pass@1 on HumanEvalFix (#20) |
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
 | Learning path | ✅ | `docs/LEARNING_PATH.md` |
@@ -214,14 +215,31 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **What (b) adds:** (1) **executable tests, so real Pass@1**, which resolves open decision #1 without Defects4J; (2) a second language (Python) plus non-abstracted Java; (3) a measure of whether quantized adapters trained on abstracted Java generalise or cause forgetting (out-of-distribution, new RQ1b).
 - **Cost:** no extra training; 164 × 2 languages × 10 models of greedy generation plus sandboxed test execution (Python subprocess; JDK for Java).
 - **Caveats to report:** possible HumanEval contamination in pre-training (affects absolute scores, not the relative comparison between configs); domain shift is intended here, not a confound.
-- ❓ *Awaiting user decision.*
+- ❓ *Awaiting user decision.* → **Decided in #20: add it.**
+
+### 20. HumanEvalFix added (evaluation only) ✅
+- **User decision:** "yeah add it". Languages: **Python + Java**. No extra training.
+- **Resolves open decision #1:** Pass@1 with real unit tests replaces the Pass@k promise in RQ1, so the RQ1 wording should say "Pass@1 on HumanEvalFix". A new sub-question **RQ1b** asks whether quantized adapters trained on abstracted Java generalise to real-identifier Java and to Python, or cause forgetting.
+- **`data_loader.py --benchmark humanevalfix`** writes `data/humanevalfix_{python,java}.jsonl` with prompt, target (`import + declaration + canonical_solution`), buggy code, bug type, entry point and hidden tests.
+- **Prompt design:** buggy code plus the **example tests** (`example_test`); the full **hidden tests** (`test`) are used only for scoring, so the model never sees the tests it is graded on. The model is asked for the complete code (whole `Solution` class with imports for Java; imports + function for Python). This may differ from OctoPack's exact prompt, so absolute numbers are not directly comparable to their leaderboard; relative comparison across M0–M9 is the goal.
+- **`src/execution.py`:** builds program = candidate + hidden tests; Python runs with `python -I` (isolated), Java runs with `javac` + `java -Xmx512m`; fresh temp dir per sample; 10 s timeout. Outcomes: passed / failed / compile_error / runtime_error / timeout. If the model returns only a body, the declaration is prepended; missing Java imports are added. Fenced code blocks are extracted for any language tag.
+- **Sanity checks (local Mac, Python 3.14, JDK 17):**
+
+| Check | Python | Java |
+|---|---|---|
+| Canonical fixes | **100 %** (164/164 passed) | **100 %** (164/164 passed) |
+| Buggy code | **0 %** (155 failed, 6 runtime error, 3 timeout) | **0 %** (151 failed, 10 runtime error, 3 timeout) |
+
+- ⚠️ **Finding 20a: longer inputs than training.** Prompt + target token lengths (DeepSeek chat template): Python mean 393, p95 621, max 903, 20/164 over 512; Java mean 582, p95 884, max 1,259, **102/164 over 512**. Inference is not truncated (the model's context is 16K), but (1) adapters were trained on ≤ 512-token sequences, which is part of the OOD shift and must be reported; (2) the evaluator needs `max_new_tokens` large enough for the longest Java target (≈ 1,024 for HumanEvalFix vs. less for CodeXGLUE).
+- ⚠️ **Safety:** `execution.py` runs model-generated code, so real predictions are scored on the disposable GPU VM or in a container, not on the laptop. The local runs above executed only the benchmark's own reference and buggy code.
+- **Threat to validity:** HumanEval may be in DeepSeek-Coder's pre-training data, which inflates absolute scores but affects all configs alike.
 
 ---
 
 ## Open decisions (❓) — to resolve with the user
-1. Pass@k: drop, or add QuixBugs-Java as an executable-test benchmark?
+1. ~~Pass@k~~ → resolved by HumanEvalFix Pass@1 (#20).
 2. Multiple seeds for a subset of configs (statistical testing)?
 3. M0: zero-shot or few-shot?
 4. Phase 0 reproduction: confirm Tier A list once artifact availability is checked.
 5. GPU platform: AWS (if the appeal is approved) or RunPod RTX 4090.
-6. Second language: evaluation-only HumanEvalFix (Python + Java), see #19. It would also resolve #1.
+6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis.

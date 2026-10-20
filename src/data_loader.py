@@ -1,8 +1,14 @@
-"""CodeXGLUE Java Code Refinement loader.
+"""Benchmark loaders.
 
-Fetches the Medium split from the Hugging Face Hub, subsamples it to the sizes
-fixed in the research plan (10k / 1k / 1k, seeded), and turns each buggy/fixed
-pair into an instruction-formatted prompt-target pair for DeepSeek-Coder-Instruct.
+CodeXGLUE Java Code Refinement (training + in-distribution test): fetches the
+Medium split from the Hugging Face Hub, subsamples it to the sizes fixed in the
+research plan (10k / 1k / 1k, seeded), and turns each buggy/fixed pair into an
+instruction-formatted prompt-target pair for DeepSeek-Coder-Instruct.
+
+HumanEvalFix (evaluation only, out-of-distribution): 164 hand-written bugs per
+language from HumanEvalPack (Muennighoff et al., 2024), with unit tests for Pass@1.
+The prompt shows the buggy function and the *example* tests; the full hidden
+tests are kept for scoring only.
 """
 
 import argparse
@@ -21,6 +27,15 @@ INSTRUCTION = (
     "(e.g. VAR_1, METHOD_1). Return only the corrected Java method, using the "
     "same abstracted tokens, with no explanation.\n\n"
     "Buggy method:\n{buggy}"
+)
+
+HUMANEVALPACK_ID = "bigcode/humanevalpack"
+HEF_LANGUAGES = ("python", "java")
+HEF_INSTRUCTION = (
+    "The following {language} code contains a bug in `{entry_point}`. "
+    "Fix the bug and return the complete corrected code{scope}, with no explanation.\n\n"
+    "Buggy code:\n```{language_tag}\n{buggy}\n```\n\n"
+    "Example tests that the fixed code must pass:\n```{language_tag}\n{example_test}\n```"
 )
 
 
@@ -46,6 +61,34 @@ def to_prompt_target(example):
         "prompt": INSTRUCTION.format(buggy=example["buggy"].strip()),
         "target": example["fixed"].strip(),
     }
+
+
+def load_humanevalfix(languages=HEF_LANGUAGES):
+    """HumanEvalFix records: prompt, target (canonical fix) and everything needed to run the tests."""
+    records = []
+    for language in languages:
+        for ex in load_dataset(HUMANEVALPACK_ID, language, split="test"):
+            header = ex["import"] + ex["declaration"]
+            records.append({
+                "id": ex["task_id"],
+                "language": language,
+                "bug_type": ex["bug_type"],
+                "entry_point": ex["entry_point"],
+                "prompt": HEF_INSTRUCTION.format(
+                    language=language.capitalize(),
+                    language_tag=language,
+                    entry_point=ex["entry_point"],
+                    scope=" (the whole `Solution` class, including imports)" if language == "java" else " (imports and the whole function)",
+                    buggy=(header + ex["buggy_solution"]).strip(),
+                    example_test=ex["example_test"].strip(),
+                ),
+                "buggy": (header + ex["buggy_solution"]).strip(),
+                "target": (header + ex["canonical_solution"]).strip(),
+                "declaration": header,
+                "test_setup": ex["test_setup"],
+                "test": ex["test"],
+            })
+    return records
 
 
 def chat_prompt(tokenizer, prompt):
@@ -97,6 +140,7 @@ def length_report(dataset, tokenizer, max_length=512):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--benchmark", default="codexglue", choices=["codexglue", "humanevalfix"])
     parser.add_argument("--subset", default="medium", choices=["small", "medium"])
     parser.add_argument("--train_size", type=int, default=10_000)
     parser.add_argument("--val_size", type=int, default=1_000)
@@ -106,6 +150,10 @@ def main():
     parser.add_argument("--model", default=DEFAULT_MODEL, help="tokenizer used for the length report")
     parser.add_argument("--output_dir", default="data")
     args = parser.parse_args()
+
+    if args.benchmark == "humanevalfix":
+        main_humanevalfix(args)
+        return
 
     splits, full_sizes = load_splits(args.subset, args.train_size, args.val_size, args.test_size, args.seed)
     print(f"Full split sizes ({args.subset}): {full_sizes}")
@@ -124,6 +172,23 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     for split, ds in splits.items():
         print(f"{split} token lengths: {length_report(ds, tokenizer, args.max_length)}")
+
+
+def main_humanevalfix(args):
+    from transformers import AutoTokenizer
+
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
+    out = Path(args.output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    records = load_humanevalfix()
+    for language in HEF_LANGUAGES:
+        rows = [r for r in records if r["language"] == language]
+        path = out / f"humanevalfix_{language}.jsonl"
+        with path.open("w") as f:
+            for r in rows:
+                f.write(json.dumps(r) + "\n")
+        print(f"Wrote {len(rows)} examples to {path}")
+        print(f"{language} token lengths: {length_report(rows, tokenizer, args.max_length)}")
 
 
 if __name__ == "__main__":
