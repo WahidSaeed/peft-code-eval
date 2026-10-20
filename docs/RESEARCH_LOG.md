@@ -205,6 +205,17 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - Added `README.md` (RQs, design matrix, findings so far, quick start, data provenance), `.gitignore`, `LICENSE`.
 - **Workflow from now on:** this log is public, so private/ops details go to `docs/private/OPS_LOG.md` and research-relevant facts go here.
 
+### 19. Discussion: add a second dataset in another language? ❓
+- **User question:** should we add another coding dataset in a different language?
+- **Why it matters:** a single language (Java) on a single abstracted benchmark is an external-validity threat that reviewers will raise.
+- **Options considered:**
+  - (a) *Train* a second set of M1–M9 on another-language dataset: doubles training (+~60 GPU-h) and analysis, and there is no CodeXGLUE-style Python refinement set with the same format. Advised against before the deadline.
+  - (b) **Evaluation-only** on **HumanEvalFix** (HumanEvalPack, Muennighoff et al., "OctoPack", ICLR 2024), *recommended*. Verified on the HF Hub `bigcode/humanevalpack`: 164 hand-written bugs per language (Python, Java, JS, Go, C++, Rust), each with `buggy_solution`, `canonical_solution`, unit tests (`test`) and a `bug_type` label (Python: value misuse 44, missing logic 33, excess logic 31, operator misuse 25, variable misuse 23, function misuse 8).
+- **What (b) adds:** (1) **executable tests, so real Pass@1**, which resolves open decision #1 without Defects4J; (2) a second language (Python) plus non-abstracted Java; (3) a measure of whether quantized adapters trained on abstracted Java generalise or cause forgetting (out-of-distribution, new RQ1b).
+- **Cost:** no extra training; 164 × 2 languages × 10 models of greedy generation plus sandboxed test execution (Python subprocess; JDK for Java).
+- **Caveats to report:** possible HumanEval contamination in pre-training (affects absolute scores, not the relative comparison between configs); domain shift is intended here, not a confound.
+- ❓ *Awaiting user decision.*
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -213,3 +224,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 3. M0: zero-shot or few-shot?
 4. Phase 0 reproduction: confirm Tier A list once artifact availability is checked.
 5. GPU platform: AWS (if the appeal is approved) or RunPod RTX 4090.
+6. Second language: evaluation-only HumanEvalFix (Python + Java), see #19. It would also resolve #1.
