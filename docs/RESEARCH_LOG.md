@@ -24,7 +24,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
-| Phase 0: reproduce Tier-A papers | ❓ | Needs artifact availability check |
+| Phase 0: reproduce Tier-A papers | ❓ | Artifacts checked (#28): Li ✅ full, Huang ✅ code+data, Wei ❌ none; scope decision pending |
 | Pass@k in RQ1 (CodeXGLUE has no tests) | ✅ | Resolved: Pass@1 on HumanEvalFix (#20) |
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
@@ -329,11 +329,32 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 
 ---
 
+## 2026-10-21
+
+### 28. Phase 0: artifact availability of the Tier-A papers ✅ (check done; scope ❓)
+- **Method:** read each paper's PDF for artifact links, then opened the repositories (GitHub API) and the Hugging Face model card. Titles/venues confirmed from the PDFs (Huang et al.: TSE 51(4), 904–928, 2025, DOI 10.1109/TSE.2025.3532759).
+
+| Paper | Artifact | What is released | Their setup | Reproducible on our 24 GB GPU? |
+|---|---|---|---|---|
+| **Li et al., ASE 2024**, PEFT on APR (arXiv 2406.05639) | ✅ `github.com/zjulgc/llmpeft4apr` (no licence file) + adapters on HF `survoltli/llmpeft4apr` | APR-INSTRUCTION (30k) + other instruction sets, train/inference/validation code, per-model train scripts, **generated patches + validation results**, **trained adapters (LoRA, IA3, prefix, p-tuning) for DeepSeek-Coder-6.7B-Base**, CodeLlama-7B/13B, Llama-2-7B | DeepSeek-Coder-6.7B-**Base**, bf16 (no quantization), LoRA r=32, α=16, dropout 0.05, lr 1e-4, 5 epochs, max_seq 1000, batch 3; benchmarks HumanEval-Java (163), Defects4J v2.0 (217), QuixBugs (40); metric pass@10 (bugs fixed); peak GPU memory reported. Pinned: torch 2.0.1, transformers 4.35.2, peft 0.6.2, Java 8 | **Yes.** Inference with their released DeepSeek LoRA adapter on HumanEval-Java + QuixBugs is cheap (~1–2 GPU-h). Retraining one config (DeepSeek LoRA, 30k × 5 epochs) is ~10–15 GPU-h. Defects4J needs the Defects4J framework (Java 8, Perl, large checkout) |
+| **Huang et al., TSE 2025**, comprehensive fine-tuning of code LLMs for APR | ✅ `github.com/LLMC-APR/STUDY` (no licence file); experimental code + data on **Google Drive** | Fine-tuning/inference code per model (InCoder, CodeGeeX2, CodeGen25, CodeLlama-13B/70B, StarCoder/2, plus small models), training data (Transfer dataset), results | Billion-level models trained with **8-bit QLoRA, 1 epoch, A100 80 GB**; LoRA / AdaLoRA / IA3 vs full fine-tuning; test on Defects4J v1.2 + HumanEval-Java; **exact match** + test-based correct patches (manual check of plausible patches) | **Partly.** A ≤7B model (e.g. InCoder-6B or CodeGen25-7B) with LoRA in 8-bit fits 24 GB; CodeLlama-13B in 8-bit is borderline; 70B no. Drive folder size and training-set size not yet checked |
+| **Wei et al., ESEC/FSE 2023**, greener code generation via quantization (arXiv 2303.05378) | ❌ none found (paper, ACM, Amazon Science, FSE page, GitHub search) | — | CodeGen 350M–16B, InCoder, CodeT5; **post-training int8** (PyTorch dynamic and static quantization); HumanEval + MBPP pass@1/5; AWS p3dn.24xlarge + MacBook M1; latency, model size, carbon estimate | **Re-implementation only.** The method is standard PyTorch PTQ and fully described, so a small re-implementation (e.g. CodeGen-2B, int8 dynamic, HumanEval pass@1) is possible, but it would not be a reproduction of their artifact. A third-party replication exists (arXiv 2503.07103) and may be a better comparison point |
+
+- ⚠️ **Direct relevance of Li et al.:** they fine-tuned **DeepSeek-Coder-6.7B** (Base, not Instruct) with LoRA **r = 32** in bf16, which is the nearest published neighbour of our **M9** (16-bit, r = 32). They also report "rank 16 is already enough", which our rank axis (r = 8/16/32) tests directly. Differences to state in the thesis: Base vs Instruct, α = 16 vs our α = 2r, their instruction data vs CodeXGLUE, pass@10 sampling vs our greedy Pass@1.
+- ⚠️ **Licences:** neither GitHub repo has a licence file. Running their code for reproduction is fine; copying their code or data into our public repo is not. We download at run time and cite.
+- **Proposed Phase 0 scope (for user decision):**
+  1. **Li et al. (primary):** (a) load their released DeepSeek-Coder-6.7B LoRA adapter and re-run their HumanEval-Java + QuixBugs validation; target their reported bugs-fixed counts. (b) retrain the same config once with their script to check the training side. Defects4J optional (setup cost).
+  2. **Huang et al. (secondary):** reproduce one LoRA cell on a ≤7B model on HumanEval-Java after checking the Drive data size.
+  3. **Wei et al.:** no artifact, so it cannot be reproduced. Either re-implement one int8 PTQ data point, or cite it (plus the 2025 replication) as related work only.
+- ❓ Waiting on the user to pick the scope.
+
+---
+
 ## Open decisions (❓) — to resolve with the user
 1. ~~Pass@k~~ → resolved by HumanEvalFix Pass@1 (#20).
 2. ~~Multiple seeds~~ → 3 seeds (42/43/44) for M2, M5, M8 (#27).
 3. ~~M0~~ → zero-shot (#27).
-4. Phase 0 reproduction: confirm Tier A list once artifact availability is checked.
+4. Phase 0 reproduction: artifacts checked (#28). Li ✅, Huang ✅ (Drive), Wei ❌. Pick the scope from #28's proposal.
 5. GPU platform: **AWS A10G** if the appeal is approved; **RunPod RTX 4090 (backlog)** only if denied (#23).
 7. ~~Other HumanEvalPack languages~~ → all six added (#22).
 6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis.
