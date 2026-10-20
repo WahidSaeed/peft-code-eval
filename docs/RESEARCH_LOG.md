@@ -436,6 +436,9 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **B.** Each benchmark's own convention: beam 5 on CodeXGLUE, sampled pass@1 (n = 20, T = 0.2) on HumanEvalFix.
   - **C.** Greedy as the primary protocol for all models, plus the benchmark conventions on a subset (M0 + M2/M5/M8).
 
+### 33. Briefing document for the decoding-protocol decision ✅
+- The user found #30–#32 confusing and asked for a single self-contained summary to discuss in NotebookLM. Written as `docs/decoding_protocol_briefing.md`. It covers the study, plain-language definitions (greedy, beam, sampling, Pass@1 vs pass@10), the verified literature, the pros and cons of greedy, options A/B/C, the remaining uncertainties, questions to explore, and source links. The decision remains ❓.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
