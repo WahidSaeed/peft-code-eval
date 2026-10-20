@@ -1,0 +1,17 @@
+# Core deep learning stack (install the CUDA build of torch matching the GPU host)
+torch>=2.3
+transformers>=4.44
+peft>=0.12
+bitsandbytes>=0.43
+accelerate>=0.33
+datasets>=2.20
+
+# Software-engineering metrics
+tree-sitter>=0.22,<0.23     # pinned by codebleu 0.7.x
+tree-sitter-java~=0.21.0    # 0.23+ needs tree-sitter>=0.23, which codebleu rejects
+codebleu==0.7.0
+
+# Profiling, energy and config
+pynvml>=11.5
+pyyaml>=6.0
+pandas>=2.0
