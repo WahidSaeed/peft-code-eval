@@ -273,6 +273,16 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Token lengths (prompt + target):** C++ mean 597 / max 1,591 (103 over 512); Go 502 / 1,012 (70); Rust 605 / 2,008 (99); JS 464 / 1,221 (49). Same OOD-length caveat as Finding 20a; the evaluator should allow up to about 1,024 new tokens (Rust max target is longer, so check).
 - **GPU VM toolchain:** `apt install -y default-jdk g++ libboost-dev libssl-dev golang nodejs cargo`. The first run downloads testify and the Rust crates into `~/.cache/peft-code-eval`.
 
+### 23. RunPod explored as the GPU platform while AWS reviews the appeal ⏳
+- **User request:** check RunPod in Chrome and pick suitable options.
+- Skipped RunPod's onboarding prompts, which suggest pasting a setup line into an AI agent (page content, not a user instruction). Chose **Pods** → template **PyTorch 2.8.0** (`runpod/pytorch:1.4.0-cu1281-torch280-ubuntu2404`, CUDA 12.8.1, Ubuntu 24.04) → **1× RTX 4090**.
+- **Prices seen (on-demand, 2026-10-20):** RTX 4090 $0.89/h (24 GB, 31 GB RAM, 8 vCPU, 7–8 available); RTX 3090 $0.50/h (24 GB, 62 GB RAM, 2 available); RTX A5000 $0.27/h (24 GB, 1 available); L4 $0.59/h; A40 $0.59/h (48 GB); RTX 5090 $1.19/h (32 GB).
+- **Chosen config (not deployed):** 1× RTX 4090, on-demand, $0.90/h total (GPU $0.89 + 50 GB container disk $0.007). The 4090 is the consumer 24 GB GPU named in the plan, and has the best availability (needed to rerun on the *same* model for weeks). A5000/3090 are cheaper but only 1–2 available.
+- **Cost estimate:** ~70–100 GPU-h → ~$65–90 plus storage. RunPod is real money, unlike the AWS credit.
+- **Storage:** the container disk is erased when the pod stops. Recommend a **network volume (~100 GB, EU data centre)** for the HF model cache, data, adapters and results; it persists independently of the pod, but pins the pod to that data centre's GPUs.
+- **Blockers (user actions):** RunPod balance is **$0.00**, so credits must be loaded before deploying; RunPod account MFA is not enabled (banner); an SSH public key is needed in Settings for terminal access.
+- **Methodology:** official M0–M9 runs must all use one GPU model. ❓ Platform decision: RunPod RTX 4090 now for everything, or RunPod for development/dry run only and AWS A10G for official runs if approved.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -280,6 +290,6 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 2. Multiple seeds for a subset of configs (statistical testing)?
 3. M0: zero-shot or few-shot?
 4. Phase 0 reproduction: confirm Tier A list once artifact availability is checked.
-5. GPU platform: AWS (if the appeal is approved) or RunPod RTX 4090.
+5. GPU platform: AWS A10G (if the appeal is approved) or RunPod RTX 4090 ($0.90/h), see #23.
 7. ~~Other HumanEvalPack languages~~ → all six added (#22).
 6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis.
