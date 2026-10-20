@@ -234,6 +234,18 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - ⚠️ **Safety:** `execution.py` runs model-generated code, so real predictions are scored on the disposable GPU VM or in a container, not on the laptop. The local runs above executed only the benchmark's own reference and buggy code.
 - **Threat to validity:** HumanEval may be in DeepSeek-Coder's pre-training data, which inflates absolute scores but affects all configs alike.
 
+### 21. Discussion: the other HumanEvalPack languages (C++, Go, Rust, JavaScript) ❓
+- **User observation:** HumanEvalFix also covers cpp, go, rust and js (164 bugs each, verified on the Hub).
+- **Cost of adding them:** no training; about 4 × 164 × 10 = 6,560 extra generations (batched, roughly 2–4 GPU-hours on top), plus per-language harness work.
+- **Harness requirements found while inspecting the data:**
+  - **JavaScript** tests use `console.assert`, which in Node **does not throw**: it prints "Assertion failed" and exits 0. A naive runner would score every buggy program as passing, so the runner must make `console.assert` throw (or check stderr).
+  - **Go** tests use `testing` + `github.com/stretchr/testify/assert`, so they need a Go module with testify and must run through `go test`.
+  - **Rust** tests are `#[cfg(test)]` modules run via `cargo test`; some tasks may need crates (to be checked), so use one shared, pre-built cargo project.
+  - **C++** tests are a `main()` with `assert` (`#undef NDEBUG` included), so g++/clang++ with C++17 works; the md5 task may need OpenSSL.
+- **Local toolchain:** clang++ 14, rustc/cargo 1.95, Node 24 present; Go to be checked.
+- **Validation rule (same as #20):** each language must pass the canonical = 100 % / buggy ≈ 0 % sanity check before use. Any canonical failure is documented and the task excluded for that language.
+- ❓ Awaiting user decision.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -242,4 +254,5 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 3. M0: zero-shot or few-shot?
 4. Phase 0 reproduction: confirm Tier A list once artifact availability is checked.
 5. GPU platform: AWS (if the appeal is approved) or RunPod RTX 4090.
+7. HumanEvalFix: add C++, Go, Rust, JavaScript too? (#21)
 6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis.
