@@ -13,6 +13,7 @@ tests are kept for scoring only.
 
 import argparse
 import json
+import re
 import statistics
 from pathlib import Path
 
@@ -30,10 +31,19 @@ INSTRUCTION = (
 )
 
 HUMANEVALPACK_ID = "bigcode/humanevalpack"
-HEF_LANGUAGES = ("python", "java")
+HEF_LANGUAGES = ("python", "java", "cpp", "go", "rust", "js")
+# language -> (display name, markdown fence tag, what "complete code" means)
+HEF_LANGUAGE_INFO = {
+    "python": ("Python", "python", "imports and the whole function"),
+    "java": ("Java", "java", "the whole `Solution` class, including imports"),
+    "cpp": ("C++", "cpp", "#include lines and the whole function"),
+    "go": ("Go", "go", "imports and the whole function"),
+    "rust": ("Rust", "rust", "use statements and the whole function"),
+    "js": ("JavaScript", "javascript", "the whole function"),
+}
 HEF_INSTRUCTION = (
     "The following {language} code contains a bug in `{entry_point}`. "
-    "Fix the bug and return the complete corrected code{scope}, with no explanation.\n\n"
+    "Fix the bug and return the complete corrected code ({scope}), with no explanation.\n\n"
     "Buggy code:\n```{language_tag}\n{buggy}\n```\n\n"
     "Example tests that the fixed code must pass:\n```{language_tag}\n{example_test}\n```"
 )
@@ -63,22 +73,58 @@ def to_prompt_target(example):
     }
 
 
+_FUNC_NAME = {
+    "python": re.compile(r"^def (\w+)\s*\(", re.M),
+    "java": re.compile(r"^\s*public [\w<>\[\], ]+? (\w+)\s*\(", re.M),
+    "cpp": re.compile(r"^[\w:<>,\* ]+?\b(\w+)\s*\([^;{]*\)\s*\{", re.M),
+    "go": re.compile(r"^func (\w+)\s*\(", re.M),
+    "rust": re.compile(r"^fn (\w+)\s*\(", re.M),
+    "js": re.compile(r"^const (\w+)\s*=", re.M),
+}
+
+
+def function_name(declaration, language):
+    """Name of the function to fix, read from the declaration itself.
+
+    The dataset's `entry_point` field sometimes disagrees with the code
+    (e.g. CPP/121 'solution' vs `solutions(`, JavaScript/114 casing).
+    """
+    names = _FUNC_NAME[language].findall(declaration)
+    return names[-1] if names else None
+
+
+def _go_helpers(ex):
+    """Helper functions that Go's `prompt` defines but its `declaration` omits (e.g. Go/10 IsPalindrome)."""
+    prompt, signature = ex["prompt"], ex["declaration"].strip()
+    cut = prompt.find(signature)
+    if cut < 0:
+        return ""
+    head = prompt[:cut].rstrip("\n").split("\n")
+    while head and head[-1].lstrip().startswith("//"):  # drop the target function's doc comment
+        head.pop()
+    head = "\n".join(head).replace(ex["import"].strip(), "", 1)
+    return head.strip() + "\n" if "func " in head else ""
+
+
 def load_humanevalfix(languages=HEF_LANGUAGES):
     """HumanEvalFix records: prompt, target (canonical fix) and everything needed to run the tests."""
     records = []
     for language in languages:
+        name, tag, scope = HEF_LANGUAGE_INFO[language]
         for ex in load_dataset(HUMANEVALPACK_ID, language, split="test"):
-            header = ex["import"] + ex["declaration"]
+            helpers = _go_helpers(ex) if language == "go" else ""
+            header = ex["import"] + helpers + ex["declaration"]
             records.append({
                 "id": ex["task_id"],
                 "language": language,
                 "bug_type": ex["bug_type"],
                 "entry_point": ex["entry_point"],
+                "function_name": function_name(ex["declaration"], language) or ex["entry_point"],
                 "prompt": HEF_INSTRUCTION.format(
-                    language=language.capitalize(),
-                    language_tag=language,
-                    entry_point=ex["entry_point"],
-                    scope=" (the whole `Solution` class, including imports)" if language == "java" else " (imports and the whole function)",
+                    language=name,
+                    language_tag=tag,
+                    entry_point=function_name(ex["declaration"], language) or ex["entry_point"],
+                    scope=scope,
                     buggy=(header + ex["buggy_solution"]).strip(),
                     example_test=ex["example_test"].strip(),
                 ),

@@ -19,7 +19,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | `src/metrics_se.py` | ✅ | Sanity-checked on ground truth |
 | `src/trainer.py` | ⏳ | Next |
 | `src/evaluator.py` | ⏳ | |
-| `src/execution.py` (HumanEvalFix Pass@1) | ✅ | Canonical 100 % / buggy 0 % in Python and Java (#20) |
+| `src/execution.py` (HumanEvalFix Pass@1) | ✅ | 6 languages; clean subset canonical 100 % / buggy 0 % (#22) |
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
@@ -244,7 +244,34 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **C++** tests are a `main()` with `assert` (`#undef NDEBUG` included), so g++/clang++ with C++17 works; the md5 task may need OpenSSL.
 - **Local toolchain:** clang++ 14, rustc/cargo 1.95, Node 24 present; Go to be checked.
 - **Validation rule (same as #20):** each language must pass the canonical = 100 % / buggy ≈ 0 % sanity check before use. Any canonical failure is documented and the task excluded for that language.
-- ❓ Awaiting user decision.
+- ❓ Awaiting user decision. → **Decided in #22: add all four.**
+
+### 22. HumanEvalFix extended to all 6 languages ✅
+- **User decision:** "yeah add all of them". HumanEvalFix now covers Python, Java, C++, Go, Rust and JavaScript (6 × 164 = 984 tasks), still evaluation-only.
+- **Harness per language (`src/execution.py`):** C++ via `c++ -std=c++17` (Boost and OpenSSL paths added; `-lcrypto` when needed); Go puts code and tests in **one file** built with `go test -c` against a cached module with testify; Rust uses one shared cargo project with `rand 0.7`, `regex 1`, `md5 0.7` (deps compiled once; `cargo test --no-run` → compile_error, then `cargo test`); JavaScript runs `node --check` and then `node` with **`console.assert` patched to throw**.
+- **Problems found and fixed while validating (each would have biased Pass@1):**
+  1. **JavaScript `console.assert` doesn't throw in Node.** It prints and exits 0, so failing code would score as passing. Patched to throw.
+  2. **The dataset's `entry_point` disagrees with the real function name in 17 tasks** (Java 3, C++ 2, Rust 11, JS 1; e.g. CPP/121 `solution` vs `solutions(`, CPP/156 `int_to_mini_roman` vs `int_to_mini_romank`, JS/114 casing). The harness wrongly prepended the declaration again. **Fix:** `data_loader.function_name()` reads the name from the declaration itself (new field `function_name`).
+  3. **Go declarations omit helper functions** that the prompt defines (11 tasks: Go/10, 32, 38, 50, 72, 107, 108, 141, 145, 158, 163). Fix: helpers are extracted from the prompt (without the target's doc comment) and included in buggy and target code.
+  4. **Go rejects unused or missing imports.** Code and tests now share one file, and the import list is repaired deterministically (drop unused, add missing standard-library packages, at most 3 rounds), identically for every candidate. Logic is never changed. The Go 1.19 wording `imported and not used: "x"` differs from newer Go's `"x" imported and not used`; both are handled.
+  5. **Rust tests use the rand 0.7 API** (`gen_range(low, high)`), so `rand` is pinned to 0.7.
+  6. **JavaScript/162 requires the npm package `js-md5`.** A local shim on Node's `crypto` is used instead of downloading it.
+- **Sanity results (local Mac):**
+
+| Language | Canonical (all 164) | Buggy (all 164) | Canonical (clean) | Buggy (clean) |
+|---|---|---|---|---|
+| Python | 100 % | 0 % | 100 % | 0 % |
+| Java | 100 % | 0 % | 100 % | 0 % |
+| C++ | 99.39 % | 0.61 % | 100 % (n=162) | 0 % |
+| Go | 100 %* | 0 % | 100 % (n=163) | 0 % |
+| Rust | 99.39 %* | 0 % | 100 % (n=163) | 0 % |
+| JavaScript | 100 % | 0 % | 100 % | 0 % |
+\* flaky tasks pass or fail from run to run.
+
+- ⚠️ **Defective tasks (dataset issues, `DEFECTIVE_TASKS` in `execution.py`):** CPP/38, the reference fix doesn't compile (unbalanced braces: 5 `{` vs 4 `}`); CPP/23, the buggy code passes the hidden tests; Go/95, flaky, since the reference depends on random map iteration order (failed 1 of 5 repeated runs); Rust/32, flaky, since an unseeded random test sometimes makes the reference Newton solver loop forever (passed in 1.5 s once, timed out after 90 s in another run).
+- **Reporting rule:** Pass@1 on all 164 per language (comparable with the literature) **and** on the clean subset (162–164 per language). The thesis uses the clean subset as primary and lists the excluded tasks.
+- **Token lengths (prompt + target):** C++ mean 597 / max 1,591 (103 over 512); Go 502 / 1,012 (70); Rust 605 / 2,008 (99); JS 464 / 1,221 (49). Same OOD-length caveat as Finding 20a; the evaluator should allow up to about 1,024 new tokens (Rust max target is longer, so check).
+- **GPU VM toolchain:** `apt install -y default-jdk g++ libboost-dev libssl-dev golang nodejs cargo`. The first run downloads testify and the Rust crates into `~/.cache/peft-code-eval`.
 
 ---
 
@@ -254,5 +281,5 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 3. M0: zero-shot or few-shot?
 4. Phase 0 reproduction: confirm Tier A list once artifact availability is checked.
 5. GPU platform: AWS (if the appeal is approved) or RunPod RTX 4090.
-7. HumanEvalFix: add C++, Go, Rust, JavaScript too? (#21)
+7. ~~Other HumanEvalPack languages~~ → all six added (#22).
 6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis.
