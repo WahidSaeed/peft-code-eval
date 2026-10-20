@@ -285,6 +285,11 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Methodology:** official M0–M9 runs must all use one GPU model.
 - **User decision:** RunPod goes to the **backlog**. It's used **only if AWS denies the appeal**; then all runs (dry run + official) move to RunPod RTX 4090 with the config above. Nothing deployed, no credits loaded.
 
+### 24. Discussion: add MBPP? → No ✅
+- **User question:** should MBPP be added to the evaluation?
+- **Assessment:** MBPP is code *generation* (a function written from a short description), not repair. The RQs are about program repair, which CodeXGLUE (in-distribution) and HumanEvalFix (out-of-distribution, 6 languages, unit tests) already cover. MBPP would only serve a *capability-retention / forgetting* question (does quantized fine-tuning hurt general generation?), which is not in the plan. If that question were ever wanted, HumanEvalSynthesize (same 164 problems × 6 languages, same harness) would fit better than MBPP (Python only, new harness).
+- **User decision:** not added. "as you said our research is code fix not generation." The scope stays program repair only; generation benchmarks are out of scope.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
