@@ -21,7 +21,7 @@ _parser = Parser(JAVA)
 
 WRAPPER_OPEN = "class __Wrapper__ {\n"
 WRAPPER_CLOSE = "\n}"
-_FENCE = re.compile(r"```(?:java)?\s*\n(.*?)```", re.DOTALL)
+_FENCE = re.compile(r"```[\w+#-]*[ \t]*\n(.*?)```", re.DOTALL)  # any language tag
 
 # CodeXGLUE's tokenisation splits some multi-char operators and drops the dot
 # in `X.class` / `Outer.this`, which Java's grammar rejects. These rules undo

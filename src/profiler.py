@@ -124,6 +124,11 @@ class GPUProfiler:
         return False
 
 
+def _sync():
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+
+
 class _FirstTokenTimer(StoppingCriteria):
     """Records the time at which the first new token has been produced."""
 
@@ -132,7 +137,7 @@ class _FirstTokenTimer(StoppingCriteria):
 
     def __call__(self, input_ids, scores, **kwargs):
         if self.first_token_time is None:
-            torch.cuda.synchronize()
+            _sync()
             self.first_token_time = time.perf_counter()
         return torch.zeros(input_ids.shape[0], dtype=torch.bool, device=input_ids.device)
 
@@ -145,7 +150,7 @@ def measure_generation(model, input_ids, attention_mask=None, **generate_kwargs)
     Decode throughput excludes the first token.
     """
     timer = _FirstTokenTimer()
-    torch.cuda.synchronize()
+    _sync()
     t0 = time.perf_counter()
     output = model.generate(
         input_ids=input_ids,
@@ -153,7 +158,7 @@ def measure_generation(model, input_ids, attention_mask=None, **generate_kwargs)
         stopping_criteria=StoppingCriteriaList([timer]),
         **generate_kwargs,
     )
-    torch.cuda.synchronize()
+    _sync()
     total = time.perf_counter() - t0
     new_tokens = output.shape[1] - input_ids.shape[1]
     ttft = (timer.first_token_time - t0) if timer.first_token_time else total

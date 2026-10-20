@@ -18,7 +18,8 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | `src/profiler.py` | ✅ (untested on GPU) | Compiles; needs GPU for a real test |
 | `src/metrics_se.py` | ✅ | Sanity-checked on ground truth |
 | `src/trainer.py` | ✅ (CPU smoke test) | GPU paths validated by the dry run (#25) |
-| `src/evaluator.py` | ⏳ | |
+| `src/evaluator.py` | ✅ (CPU smoke test) | Batched predictions + batch-1 latency probe (#26) |
+| `scripts/run_matrix.sh`, `scripts/evaluate_all.sh` | ✅ | Tested in a bash 5 container (#26) |
 | `src/execution.py` (HumanEvalFix Pass@1) | ✅ | 6 languages; clean subset canonical 100 % / buggy 0 % (#22) |
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
@@ -305,6 +306,18 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - ✅ **Learning-path exercise confirmed** (meta-device model, no weights loaded): DeepSeek-Coder-6.7B = LLaMA, 32 layers, hidden 4096, intermediate 11008, vocab 32,256, 6,740,512,768 params. LoRA trainable = 2,498,560 × r → **19.99M (0.297 %) / 39.98M (0.593 %) / 79.95M (1.186 %)** for r = 8/16/32; adapters 38 / 76 / 152 MB in bf16.
 - **Compatibility:** transformers 5 removed `warmup_ratio` (a float ratio now goes in `warmup_steps`); `trainer.py` detects which applies. `requirements.txt` now needs `transformers>=4.56` (for `dtype=`).
 - ⚠️ **Not testable without a GPU:** the 4-bit/8-bit loading (bitsandbytes is CUDA-only), the paged optimizer, VRAM and energy measurement. These are validated by the 50-step M1 dry run on the GPU.
+
+### 26. `src/evaluator.py` + run scripts ✅ (CPU smoke-tested)
+- **`evaluator.py`** loads the base at `--bits` (4/8/16) and applies the adapter **unmerged** (how QLoRA models are served; M0 = no adapter, 16-bit). Greedy decoding (`do_sample=False`, 1 beam), stopping at `<|EOT|>`, left padding for batching.
+  - **Phase 1, batched generation** (default batch 8; prompts length-sorted to cut padding, output order preserved) over the full test set → predictions JSONL with every field `metrics_se.py` / `execution.py` need; profiled for generation tokens/s, samples/s, peak inference VRAM and energy.
+  - **Phase 2, latency probe** at **batch size 1** on the first 50 prompts → median and p90 TTFT, median decode tokens/s, single-request peak VRAM (RQ3: what one developer experiences). A short warm-up generation runs before measuring.
+  - **`max_new_tokens`** from measured reference lengths (DeepSeek tokenizer): CodeXGLUE test max 194 (p99 182) → **256**; HumanEvalFix max 935 (Rust; Java 507, C++ 728, JS 545, Go 394, Python 296) → **1,024**. Each run records how many outputs hit the limit (`hit_max_new_tokens`).
+  - `--score` scores CodeXGLUE inline (EM, CodeBLEU, syntax). HumanEvalFix is scored separately with `execution.py`, because it runs model-written code.
+- **`metrics_se.extract_code`** now strips code fences with any language tag (it was Java-only).
+- **Profiler:** `measure_generation` and `GPUProfiler` work without CUDA (CPU smoke tests). A **p90 bug** was caught in testing: the first version computed p90 with the wrong rounding and returned a value below the median for 2 samples. It now uses the nearest-rank method.
+- **`scripts/run_matrix.sh`** trains M1–M9 (or selected cells) with the fixed bits/rank map, skips cells whose adapter exists (resumable), and `DRY_RUN=N` writes to `results/runs/dry_<cell>` and `results/dry_log.csv`. **`scripts/evaluate_all.sh`** runs CodeXGLUE (scored) + HumanEvalFix generation + test execution for M0–M9, skipping untrained models. Both need bash ≥ 4 (guarded).
+- **Tests:** evaluator end to end on CPU with the tiny model (M0 on CodeXGLUE with scoring; adapter on HumanEvalFix → `execution.py` scores it: 0 %, as expected for a random model). Scripts tested in a `bash:5.2` container with a stub `python` that prints commands: correct bits/rank per cell, skip logic, dry-run paths, M0 without adapter; macOS bash 3.2 is refused with a clear message.
+- **Pipeline status:** data → training → inference → metrics → test harness → run scripts are all implemented. Only the analysis scripts (Pareto plots, LaTeX tables, statistical tests) remain, and they need real results first.
 
 ---
 

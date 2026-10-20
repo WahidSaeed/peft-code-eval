@@ -2,7 +2,7 @@
 
 Replication package for an MEng thesis (GISMA University of Applied Sciences, Berlin): an empirical study of how **bit-width** (4-bit NF4 QLoRA, 8-bit, 16-bit bf16 LoRA) and **LoRA rank** (r ∈ {8, 16, 32}) trade off **correctness, GPU memory, speed and energy** when fine-tuning a large code model for Java bug fixing.
 
-> 🚧 **Work in progress.** Data pipeline, metrics, test harness and trainer are implemented and validated (trainer smoke-tested on CPU; GPU runs pending). The inference/evaluation script is next. Results will be added as runs complete.
+> 🚧 **Work in progress.** The full pipeline (data, training, inference, metrics, test harness, run scripts) is implemented and smoke-tested on CPU. GPU runs are pending. Results will be added as runs complete.
 
 ## Research questions
 
@@ -54,8 +54,11 @@ src/
   execution.py     sandboxed test runner for HumanEvalFix Pass@1 (Python, Java, C++, Go, Rust, JS)
   profiler.py      peak VRAM, throughput, NVML energy, TTFT, trainable-parameter ratio, CSV logging
   trainer.py       PEFT training for one matrix cell (--bits 4|8|16, --rank, --alpha) with profiling + CSV log
-  evaluator.py     (planned) greedy batch inference
-configs/  scripts/  analysis/   (planned) run configs, matrix runner, Pareto plots and LaTeX tables
+  evaluator.py     greedy inference for M0–M9: batched predictions + batch-size-1 latency probe (TTFT, decode tok/s)
+scripts/
+  run_matrix.sh    train M1–M9 (or selected cells; DRY_RUN=50 for dry runs); resumable
+  evaluate_all.sh  predictions + scores for M0–M9 on CodeXGLUE and HumanEvalFix
+analysis/          (planned) Pareto plots and LaTeX tables
 docs/
   RESEARCH_LOG.md      chronological log of decisions, actions and findings
   LEARNING_PATH.md     background reading and exercises behind every design choice
@@ -92,6 +95,16 @@ python src/trainer.py --bits 4 --rank 8 --run_name dry --output_dir results/runs
 ```
 
 Each run writes `adapter/`, `run_config.json` (all arguments, fixed hyperparameters, library versions, results) and appends one row to `results/train_log.csv` (peak VRAM allocated/reserved, static VRAM after load, duration with and without evaluation, samples/s, tokens/s, energy, losses, GPU name).
+
+Full experiment on the GPU machine (bash ≥ 4):
+
+```bash
+DRY_RUN=50 bash scripts/run_matrix.sh M1   # 1. dry run: checks 4-bit loading, VRAM and energy logging
+bash scripts/run_matrix.sh                 # 2. train M1–M9 (resumable: finished cells are skipped)
+bash scripts/evaluate_all.sh               # 3. predictions + scores for M0–M9
+```
+
+Outputs: `results/train_log.csv`, `results/eval_log.csv` (throughput, TTFT, inference VRAM, energy, CodeXGLUE EM/CodeBLEU/syntax), `results/predictions/*.jsonl`, `results/scores/*` (HumanEvalFix Pass@1 per language, all and clean).
 
 Version note: `codebleu==0.7.0` requires `tree-sitter` 0.22.x, which in turn requires `tree-sitter-java` 0.21.x. The pins in `requirements.txt` are tested together.
 
