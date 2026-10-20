@@ -437,7 +437,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **C.** Greedy as the primary protocol for all models, plus the benchmark conventions on a subset (M0 + M2/M5/M8).
 
 ### 33. Briefing document for the decoding-protocol decision ✅
-- The user found #30–#32 confusing and asked for a single self-contained summary to discuss in NotebookLM. Written as `docs/decoding_protocol_briefing.md`. It covers the study, plain-language definitions (greedy, beam, sampling, Pass@1 vs pass@10), the verified literature, the pros and cons of greedy, options A/B/C, the remaining uncertainties, questions to explore, and source links. The decision remains ❓.
+- The user found #30–#32 confusing and asked for a single self-contained summary to discuss in NotebookLM. Written as `docs/decoding_protocol_briefing.md` (renamed to `docs/methodology_briefing.md` in #35). It covers the study, plain-language definitions (greedy, beam, sampling, Pass@1 vs pass@10), the verified literature, the pros and cons of greedy, options A/B/C, the remaining uncertainties, questions to explore, and source links. The decision remains ❓.
 
 ### 34. Discussion: training on Java (CodeXGLUE) but evaluating on 6 languages (HumanEvalFix) ❓
 - **User question:** if we train only on CodeXGLUE Java, how can we evaluate on other languages?
@@ -457,6 +457,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **(b)** Add multilingual repair training data (e.g. CommitPackFT, used by OctoPack): a different study, much bigger.
   - **(c)** Find a Java repair test set with unit tests matching the training format: none known with abstracted identifiers, so it would still be OOD.
 - ❓ Awaiting user discussion. The assistant's recommendation is (a).
+
+### 35. Briefing extended with Problem 2 ✅
+- At the user's request, the cross-language evaluation question (#34) was added to the briefing as a second problem. The file was renamed `docs/decoding_protocol_briefing.md` → **`docs/methodology_briefing.md`**.
+- New content:
+  - Problem 2: why the evaluation is possible, transfer vs forgetting, the format-shift vs language-shift split, the RQ1/RQ1b reframing, the two risks (below-M0 scores, floor effect), and options a/b/c.
+  - A section on how the two problems connect: under the reframing, published comparability matters mainly for M0, so only a small extra protocol run is needed.
+  - Questions 6–11, and Biderman et al. (TMLR 2024, "LoRA Learns Less and Forgets Less", arXiv 2405.09673, verified) added as a source.
+- Both decisions remain ❓.
 
 ---
 
