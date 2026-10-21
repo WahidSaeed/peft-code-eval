@@ -508,6 +508,55 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     7. **In-task similarity:** EM / CodeBLEU / syntax on a held-out Megadiff test split replaces CodeXGLUE's.
 - ❓ Awaiting the user. Feasibility check (#36) still pending.
 
+### 38. Feasibility check: Megadiff (training) + HumanEval-Java (evaluation) ✅
+- **User decisions (#37):** pass@1 primary + pass@10 secondary, from the same samples ✅; **add HumanEval-Java** ✅; run the feasibility check ✅. The Megadiff switch itself is still pending, on these results.
+- **Scripts:** `analysis/feasibility/megadiff_feasibility.py`, `analysis/feasibility/hej_sanity.py` (CPU only, local Mac).
+
+#### Megadiff single-function (`ASSERT-KTH/megadiff-single-function`, 72,393 rows, 546 MB download)
+- **Licence:** **none stated**, on either the GitHub repo or the HF card. The underlying code comes from open-source projects under their own licences. → Research use with citation (Monperrus et al., arXiv 2108.04631); we don't redistribute it (downloaded at run time; `data/` is gitignored).
+- **Content:**
+  - all rows are single-function; 70% single-hunk;
+  - changed lines: median 2, p95 14, max 40; 81% change ≤ 6 lines (small, bug-fix-sized edits).
+- **Trivial changes:** 0 identical, 489 whitespace-only, 1,614 comment-only → dropped.
+- **Duplicates:** 5,608 extra copies of identical (buggy, fixed) pairs → deduplicated.
+- **Clean pool:** **64,834** pairs.
+- **Noise spot-check** (12 random clean diffs, assistant's judgement, indicative only):
+  - ~8–9 look like real fixes: overflow `700L*…`, bounds `hasRemaining()`, reversed `isAssignableFrom`, exception handling, increment errors;
+  - ~3 do not: parameter rename, log-level change, message edit.
+  - → Megadiff is "code changes", not curated bug fixes. Roughly a quarter may be non-fix changes; state as a limitation.
+- ⚠️ **Lengths (DeepSeek tokenizer, chat-formatted prompt + target + EOS):** mean 2,533, **median 1,236**, p95 7,510 tokens. Megadiff functions (median ~590 tokens) are much longer than HumanEvalFix-Java functions (median 130, p95 281).
+
+| Token cap | Clean pairs | Mean tokens | Note |
+|---|---|---|---|
+| ≤ 512 | **10,398** | 356 | Same compute as the CodeXGLUE plan (mean 369); closest to eval function sizes; too few for 10k/1k/1k |
+| ≤ 768 | 19,616 | 489 | 10k/1k/1k possible; ~1.35× training tokens; longer max_length (more activation memory) |
+| ≤ 1,024 | 27,283 | 602 | RepairLLaMA-like; ~1.6× tokens |
+
+- **Contamination vs HumanEvalFix-Java:**
+  - 58 Megadiff rows share a 20-token sequence with a HumanEvalFix-Java fix (21 tasks). Inspected matches are **generic idioms** (`for ( int i = 0 ; i < lst . size ( ) ; i + + ) {`, a `Comparator<String>` boilerplate), not leaked solutions.
+  - 32/157 function names also occur, but they are generic (`add`, `compare`, `median`).
+  - → No evidence of leakage. Conservative rule: drop the 58 rows anyway.
+- **Split leakage risk:** the same project can appear in train and in the held-out Megadiff test split (no repository field; only file paths in `diff`). This would inflate in-task EM/CodeBLEU, not the test-based HumanEval metrics. Mitigation: split by file path, or treat Megadiff-test EM as secondary.
+
+#### HumanEval-Java (`lin-tan/clm`, Jiang et al., ICSE 2023)
+- **Licence:** BSD-3-Clause.
+- **Format:** 163 single-function bugs (bugs injected by mutation operators). Each has a whole buggy class (`src/main/java/humaneval/buggy`), a correct class (`…/correct`), and JUnit 4 tests (`src/test/java/humaneval/TEST_*.java`, 3 s timeout per test). JUnit/Hamcrest jars are bundled → plain `javac` + `JUnitCore`, no Maven.
+- **Requires JDK 8:** `DO_ALGEBRA` uses the Nashorn JavaScript engine, `STRING_TO_MD5` uses `javax.xml.bind` (both removed in newer JDKs). The GPU VM needs `openjdk-8-jdk` in addition to the default JDK used for HumanEvalFix.
+- **Sanity (JDK 8):** correct 162/163 pass, buggy 162/163 fail, after handling:
+  1. **GET_ROW:** the buggy and correct files have **swapped package declarations** (`buggy/GET_ROW.java` says `package humaneval.correct`). Fixed by normalising the package line.
+  2. **ISCUBE:** the buggy file is **identical** to the correct one (no bug) → exclude (like CPP/23 in HumanEvalFix).
+  3. **DO_ALGEBRA:** passes alone (3/3 runs), fails under 8-way parallel load (3 s JUnit timeout plus Nashorn start-up) → run serially or flag as flaky.
+  4. The `fix` strings in `humaneval-java-sf.json` match the correct files; whole-file versions are used to avoid line-range errors.
+  - → **Clean set: 162 bugs.** With HumanEvalFix-Java's 164: **326 test-based Java bugs** (same underlying problems, different bugs; correlated).
+- **javac quirk:** JDK 8 `javac -d` doesn't create the output directory; the harness must create it.
+
+#### Updated cost (estimates until the dry run)
+- **Training:** at a ≤ 512 cap, the same as the CodeXGLUE estimate (mean 356 vs 369 tokens); at ≤ 768, ~1.35×.
+- **Evaluation per model:** 326 bugs × 20 samples = 6,520 sampled generations, plus greedy EM on a Megadiff test split, plus the greedy latency probe. Roughly 2.5–3.5 GPU-h per model → ~40–55 GPU-h for 16 models (halve with n = 10).
+- **CPU:** ~104k Java test runs in total, ~5 h on 8 cores.
+- **Overall:** roughly 110–150 GPU-h (~$135–180), within the $700 credit.
+- ❓ **For the user:** (1) switch to Megadiff, yes or no; (2) token cap ≤ 512 vs ≤ 768; (3) the split rule.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
