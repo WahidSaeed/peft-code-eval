@@ -694,6 +694,17 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **There is no standard GPU.** The closest PEFT study (Weyssow) uses a single 24 GB data-centre card of the same class as our A10G, so one 24 GB GPU is well precedented for the "consumer-budget" framing. The APR fine-tuning papers use 80 GB cards because they don't study memory limits.
 - **Consequence:** report the exact GPU model in the thesis; a 24 GB card is the faithful choice for RQ2. A larger card capped at 24 GiB is defensible but second best.
 
+### 48. Justification of the GPU choice (A10G, 24 GB) ✅
+- **Asked by the user:** how to justify and defend the A10G (24 GB) in the thesis. Draft subsection written outside this repo: `thesis/03-methodology-hardware.md`.
+- **Arguments:**
+  1. **Construct validity for RQ2:** the question is what fits a ≤ 24 GB budget, so the card's *physical* memory must be the limit: OOM is observed, not inferred (80 GB cards) or emulated (a larger card capped in software, where the CUDA context and non-PyTorch allocations sit outside the cap). Evidence from the dry run (#46): 16-bit inference with 20 samples at once on the longest prompts *did* OOM, so the budget binds.
+  2. **Conservative stand-in for consumer 24 GB cards:** Ampere GA102 like the RTX 3090 (bf16, int8 tensor cores used by bitsandbytes). Usable memory measured at ~22 GiB, below a consumer card's 24 GB, so "fits on the A10G" implies "fits on a 3090/4090". Peak allocated memory depends on the model, settings and software stack, not the card class, so RQ2 numbers carry over.
+  3. **Precedent (#47):** Weyssow et al. (TOSEM 2025), a single 24 GB RTX A5000; Huang et al. (TSE 2025), a 24 GB RTX 3090 for part of their study. The APR papers on 80 GB cards don't study memory limits.
+  4. **Measurement quality and reproducibility:** data-centre card (ECC, stable clocks), NVML's cumulative energy counter (used in the dry run), widely available on demand, one GPU model for the whole campaign, ~$1.1–1.2/h.
+- **Alternatives rejected:** 40–96 GB cards (no real limit for RQ2); 48 GB capped (emulation, second best); 16 GB cards (M7–M9 don't fit; T4 has no bf16); RTX 4090 (a legitimate alternative, named as such: community clouds only, no ECC, uncertain availability of one model over weeks).
+- **Threats and mitigations:** absolute speed and energy are specific to the card → conclusions rest on relative comparisons on identical hardware; usable memory ~22 GiB → conservative, and the exact figure is reported; A10/A10G mixing on one platform → `gpu_name` is logged per run and must be pinned.
+- **To do before submission:** take spec figures (bandwidth, board power, compute) from NVIDIA's official datasheets and cite them; consistently use the wording "24 GB-class GPU".
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
