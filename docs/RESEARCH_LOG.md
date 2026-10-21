@@ -755,6 +755,21 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **How the harness is validated:** reference fixes must pass 100% (a known-correct answer failing means the harness is broken) and the buggy code 0% (buggy code passing means the tests can't detect the bug). This check is re-run after every harness change.
 - **Thesis wording:** "test-execution harness" or "evaluation harness".
 
+### 52. Acceptance rule for the M0 harness check, fixed *before* reading the re-scored result ✅
+- **Asked by the user:** what if M0 scores *above* 52.2? Written down at ~23:05 CEST on 2026-10-21, after the re-scoring job (#50) finished but **before its output was opened**, so the rule can't be fitted to the number.
+- **52.2 is a reference point, not a target or a ceiling.** It was measured with a different protocol (bigcode-evaluation-harness prompt and post-processing, its own library versions), so an exact match isn't expected in either direction.
+- **Statistical tolerance:** with 164 tasks, the per-task pass rates of the v1 scoring have SD 0.393, so the standard error of pass@1 is ±3.1 pp and the 95% interval about **±6 pp**. (This is spread over tasks only; it ignores the reference value's own uncertainty, so it's a lower bound.)
+- **Rule:**
+  1. **|M0 − 52.2| ≤ 6 pp → harness validated**, whichever side.
+  2. **Outside that band, in either direction → investigate with the same checks**, not only when the score is low:
+     - buggy code must still score 0% and reference fixes 100%;
+     - manually inspect a random sample of ~20 *passed* and ~20 *failed* samples (false passes would show as wrong code that passed);
+     - confirm the tests really run (assertions executed, not skipped);
+     - list the protocol differences (prompt wording, example tests in the prompt, chat template, max_new_tokens, post-processing).
+  3. **Any further harness change must be justified on its own terms** (it fixes a demonstrable defect, matches the reference harness, and passes the 100% / 0% check). It is never justified by moving the score towards 52.2.
+- **Why a high score would be suspicious:** a harness that's too lenient (false passes) inflates every model equally, hiding real differences between configurations. A score above the reference therefore needs the same scrutiny as one below.
+- **Why it matters less than it seems:** M0 is a baseline. The thesis's conclusions rest on differences between configurations, all scored by the same harness, so a constant protocol offset affects every model alike.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
