@@ -21,6 +21,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | `src/evaluator.py` | ✅ (CPU smoke test) | Greedy (Megadiff) / n = 20 sampling (test-based) + greedy batch-1 latency probe (#26, #39) |
 | `scripts/run_matrix.sh`, `scripts/evaluate_all.sh` | ✅ | Tested in a bash 5 container (#26) |
 | `src/execution.py` (pass@1, pass@10) | ✅ | HumanEvalFix-Java + HumanEval-Java: clean sets canonical 100 % / buggy 0 % (#39); other HEF languages validated in #22 |
+| GPU dry run | ✅ | Modal A10/A10G: all bit-widths fit 24 GB; ~170–200 GPU-h total (#46) |
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
@@ -643,6 +644,41 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - §7: the real repository layout.
   - §8: schedule re-based. Week 1 ✅; week 2 = methodology freeze ✅ + GPU dry run (blocked on AWS); training in week 3, evaluation in week 4. The target finish (late November) is unchanged. Budget: ~110–150 GPU-h.
 - The CodeXGLUE / Defects4J / RunPod-Colab wording is gone from the plan. #44's note that "the rest of the plan is still the original text" no longer applies.
+
+### 46. GPU dry run on Modal (A10 / A10G, 24 GB) ✅ with findings ⚠️
+- **Why Modal:** the AWS quota appeal (#41) and a second provider's limit request are both pending; Modal runs serverless GPU jobs from the free monthly credit with no quota request. New: `scripts/modal_app.py` (repo + pinned requirements + JDK 8 + HumanEval-Java in a container; Hugging Face cache and `results/` on Modal volumes), `scripts/dry_run.sh`, `scripts/dry_run_batch.sh`. Total dry-run cost ≈ $3 of credit.
+- **Training, 50 optimizer steps each** (max_length 768, batch 4 × grad-accum 4, gradient checkpointing, 0 truncated):
+
+| Cell | GPU | Peak VRAM alloc / reserved (GiB) | s / step | samples/s | Energy (Wh, 50 steps + val) | Projected full run (1,875 steps) |
+|---|---|---|---|---|---|---|
+| M1 4-bit r8 | A10 | 7.32 / 9.73 | 14.6 | 0.81 | 40.9 | ~7.6 h |
+| M3 4-bit r32 | A10 | 7.66 / 10.75 | 14.6 | 0.81 | 41.0 | ~7.6 h |
+| M6 8-bit r32 | A10G | 10.59 / 12.84 | 17.8 | 0.71 | 72.5 | ~9.3 h |
+| M9 16-bit r32 | A10G | 15.10 / 18.15 | 13.1 | 0.91 | 54.0 | ~6.8 h |
+| M1, batch 8 × 2 | A10G | 9.98 / 14.45 | 16.4 | 0.72 | 64.8 | ~8.6 h |
+| M9, batch 8 × 2 | A10G | 16.99 / 21.12 | 14.0 | 0.86 | 56.1 | ~7.3 h |
+
+  - **Every bit-width fits 24 GB** at max_length 768; the worst case (16-bit r32) peaks at 15.1 GiB allocated.
+  - Rank barely changes speed or memory (M1 ≈ M3). 8-bit is the slowest (LLM.int8() matmuls); 16-bit is the fastest.
+  - **Batch 8 × 2 is not faster** than 4 × 4 (0.72 vs 0.81 samples/s for M1; 0.86 vs 0.91 for M9), so the planned 4 × 4 stays. Caveat: the batch-4 and batch-8 M1 runs landed on different GPUs (see below).
+  - Validation pass over 1,000 pairs: ~4 min.
+- **Inference:**
+  - First attempt: **CUDA out of memory** for the 16-bit model drawing all 20 samples in one `generate()` on the longest HumanEvalFix-Java prompts (the KV cache of 20 × ~1,650 tokens is ~16 GB next to 12.9 GB of weights).
+  - **Fix:** `generate_all` now draws each prompt's samples in chunks of `--batch_size` sequences (default 10 → 2 × 10), the same for every model, so throughput stays comparable. Re-test on the 4 longest prompts: peak 19.6 GiB allocated, 108 tokens/s, 70 s per bug, 0 outputs hitting max_new_tokens.
+  - HumanEval-Java, M1 dry adapter, 4 tasks × 20 samples: 137 tokens/s. Megadiff, M9 dry adapter, greedy, 40 pairs: syntax 100%, EM 5.0%, CodeBLEU 0.904 (50 training steps only: a pipeline check, not a result).
+  - Latency probe (batch 1, greedy): TTFT median 0.15–0.17 s, decode 12–16 tokens/s.
+  - The test harness ran on the generated samples inside the container: pass@1 and pass@10 are computed (outcomes passed / failed / compile_error).
+- ⚠️ **Modal's "A10" GPU type is not one GPU model:** the first job got an NVIDIA A10, later jobs an NVIDIA A10G (same 24 GB class and similar compute, but different board power). Speed and energy (RQ3) are not comparable across the two. If Modal is used for official runs, each job must check the GPU name and refuse a mismatch (`gpu_name` is already logged in every CSV row).
+- **Bugs found and fixed:**
+  1. A detached `modal run` was cancelled when the local client process exited (M6 at step 37). Long jobs now use `modal deploy` + a server-side `spawn`.
+  2. `append_csv` wrote rows with extra columns (e.g. Megadiff scores) under the old header, so the values were unlabelled. It now rewrites the file with the union header.
+  3. The clm repository ships HumanEval-Java as a tarball; the README, `setup_gpu_vm.sh` and the Modal image now extract it.
+  4. `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` is set in the Modal container (the same for every run) to reduce fragmentation.
+- ⚠️ **Compute estimate, revised upwards** (A10/A10G):
+  - Training: 5 runs per bit-width (3 ranks + 2 extra seeds at r16): 4-bit ~39 h, 8-bit ~48 h, 16-bit ~35 h → **~120 GPU-h**.
+  - Evaluation: ~3–5 h per model × 16 models → **~50–80 GPU-h**.
+  - **Total ≈ 170–200 GPU-h (~$190–240)**, up from 110–150 (#38). It still fits the $700 AWS credit; it needs about 7–8 days of continuous GPU time on one card, which puts pressure on the schedule (§8 of the plan).
+- ❓ **For the user:** the platform for the official runs (AWS A10G if approved; Modal with GPU-name pinning; another provider), given the higher estimate and the deadline.
 
 ---
 

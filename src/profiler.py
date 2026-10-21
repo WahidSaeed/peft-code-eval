@@ -205,12 +205,21 @@ def trainable_parameters(model):
 
 
 def append_csv(path, row):
-    """Append one result row to a CSV, writing the header on first use."""
+    """Append one result row to a CSV. If the row brings new columns (e.g. scores), the file is
+    rewritten with the union header, so no value ever lands under the wrong column name."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    new_file = not path.exists()
-    with path.open("a", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=list(row.keys()))
-        if new_file:
-            writer.writeheader()
-        writer.writerow(row)
+    old_rows, fields = [], []
+    if path.exists() and path.stat().st_size:
+        with path.open(newline="") as f:
+            reader = csv.DictReader(f)
+            old_rows, fields = list(reader), list(reader.fieldnames or [])
+    new_fields = [k for k in row if k not in fields]
+    if fields and not new_fields:
+        with path.open("a", newline="") as f:
+            csv.DictWriter(f, fieldnames=fields).writerow(row)
+        return
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields + new_fields, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows(old_rows + [row])

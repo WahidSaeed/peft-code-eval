@@ -75,8 +75,10 @@ def load_model(model_name, bits, adapter=None):
     return model
 
 
-def _gen_kwargs(tokenizer, max_new_tokens, n_samples=1, temperature=0.2, top_p=0.95):
-    """Greedy for n_samples == 1, otherwise n_samples sampled sequences per prompt."""
+def _gen_kwargs(tokenizer, max_new_tokens, n_samples=1, temperature=0.2, top_p=0.95, sample=None):
+    """Greedy for n_samples == 1, otherwise n_samples sampled sequences per prompt.
+    `sample` overrides the choice (a sampled run split into chunks may have a chunk of 1)."""
+    sample = n_samples > 1 if sample is None else sample
     kwargs = {
         "do_sample": False,
         "num_beams": 1,
@@ -84,7 +86,7 @@ def _gen_kwargs(tokenizer, max_new_tokens, n_samples=1, temperature=0.2, top_p=0
         "eos_token_id": tokenizer.eos_token_id,
         "pad_token_id": tokenizer.pad_token_id,
     }
-    if n_samples > 1:
+    if sample:
         kwargs.update(do_sample=True, temperature=temperature, top_p=top_p, num_return_sequences=n_samples)
     return kwargs
 
@@ -106,23 +108,28 @@ def generate_all(model, tokenizer, prompts, batch_size, max_new_tokens, n_sample
                  prof=None):
     """Batched generation; prompts are length-sorted to cut padding, output keeps input order.
 
-    batch_size counts sequences: with n_samples > 1, batch_size // n_samples prompts (at least 1)
-    go into each generate() call. Returns per prompt a list of n_samples outputs and token counts.
+    batch_size counts sequences per generate() call. With n_samples <= batch_size, batch_size // n_samples
+    prompts go into one call; with n_samples > batch_size, each prompt's samples are drawn in chunks of
+    batch_size (the KV cache of 20 long sequences does not fit next to a 16-bit model, RESEARCH_LOG #46).
+    Returns per prompt a list of n_samples outputs and token counts.
     """
     order = sorted(range(len(prompts)), key=lambda i: len(prompts[i]))
-    outputs, n_tokens = [None] * len(prompts), [None] * len(prompts)
-    kwargs = _gen_kwargs(tokenizer, max_new_tokens, n_samples, temperature, top_p)
+    outputs, n_tokens = [[] for _ in prompts], [[] for _ in prompts]
+    chunk = min(n_samples, batch_size)
     per_call = max(1, batch_size // n_samples)
     device = model.device
     for start in range(0, len(order), per_call):
         idx = order[start:start + per_call]
         enc = tokenizer([prompts[i] for i in idx], return_tensors="pt", padding=True, add_special_tokens=False).to(device)
-        out = model.generate(**enc, **kwargs)
-        new = out[:, enc["input_ids"].shape[1]:]  # rows: prompt 0 × n_samples, prompt 1 × n_samples, ...
-        for k, i in enumerate(idx):
-            rows = new[k * n_samples:(k + 1) * n_samples]
-            outputs[i] = [tokenizer.decode(r, skip_special_tokens=True) for r in rows]
-            n_tokens[i] = [_n_generated(r.tolist(), tokenizer.eos_token_id, tokenizer.pad_token_id) for r in rows]
+        for done in range(0, n_samples, chunk):
+            k_seq = min(chunk, n_samples - done)
+            kwargs = _gen_kwargs(tokenizer, max_new_tokens, k_seq, temperature, top_p, sample=n_samples > 1)
+            out = model.generate(**enc, **kwargs)
+            new = out[:, enc["input_ids"].shape[1]:]  # rows: prompt 0 × k_seq, prompt 1 × k_seq, ...
+            for k, i in enumerate(idx):
+                rows = new[k * k_seq:(k + 1) * k_seq]
+                outputs[i] += [tokenizer.decode(r, skip_special_tokens=True) for r in rows]
+                n_tokens[i] += [_n_generated(r.tolist(), tokenizer.eos_token_id, tokenizer.pad_token_id) for r in rows]
         if prof is not None:
             prof.add(samples=len(idx) * n_samples, tokens=sum(sum(n_tokens[i]) for i in idx))
         print(f"  generated {min(start + per_call, len(order))}/{len(order)} prompts", flush=True)
@@ -169,7 +176,8 @@ def parse_args(argv=None):
     p.add_argument("--data_dir", default="data")
     p.add_argument("--output_dir", default="results/predictions")
     p.add_argument("--log_csv", default="results/eval_log.csv")
-    p.add_argument("--batch_size", type=int, default=20, help="sequences per generate() call")
+    p.add_argument("--batch_size", type=int, default=10,
+                   help="sequences per generate() call; 20 samples are drawn as 2 x 10 (fits a 16-bit model on 24 GB)")
     p.add_argument("--max_new_tokens", type=int, help=f"default per benchmark: {MAX_NEW_TOKENS}")
     p.add_argument("--n_samples", type=int, help=f"samples per prompt; 1 = greedy. Default per benchmark: {N_SAMPLES}")
     p.add_argument("--temperature", type=float, default=0.2)

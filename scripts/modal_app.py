@@ -47,7 +47,8 @@ app = modal.App("peft-code-eval")
 @app.function(gpu=GPU, image=image, volumes={"/cache/hf": hf_cache, "/results": results}, timeout=6 * 3600)
 def run(cmd: str):
     env = {**os.environ, "HF_HOME": "/cache/hf", "HEJ_JAVA_HOME": "/opt/jdk8",
-           "HEJ_LIB": "/opt/clm/humaneval-java/lib"}
+           "HEJ_LIB": "/opt/clm/humaneval-java/lib",
+           "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"}  # less fragmentation; same for every run
     setup = "cd /root/repo && ln -sfn /results results && ln -sfn /opt/clm data/clm"
     try:
         subprocess.run(["bash", "-c", f"{setup} && {cmd}"], check=True, env=env)
