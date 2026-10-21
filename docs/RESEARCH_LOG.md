@@ -624,6 +624,9 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **RQ1 metrics, final:** pass@1 (primary) and pass@10 on HumanEvalFix-Java + HumanEval-Java (n = 20, T = 0.2, top-p 0.95); EM / CodeBLEU / syntax on the Megadiff test split (greedy) as an in-task check.
 - **No code change:** `evaluator.py` already decodes Megadiff greedily (`N_SAMPLES["megadiff"] = 1`).
 
+### 43. Methodology briefing removed ✅
+- `docs/methodology_briefing.md` (#33, #35) was written to discuss the open decoding and dataset questions. All of them are now decided (#37–#42), so at the user's request it was deleted. It remains in the git history.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user

@@ -65,8 +65,7 @@ analysis/
   feasibility/     Megadiff statistics and HumanEval-Java sanity check behind the data switch (log #38)
                    (planned) Pareto plots and LaTeX tables
 docs/
-  RESEARCH_LOG.md          chronological log of decisions, actions and findings
-  methodology_briefing.md  self-contained briefing on the decoding and dataset questions (log #33–#35)
+  RESEARCH_LOG.md      chronological log of decisions, actions and findings
   LEARNING_PATH.md     background reading and exercises behind every design choice
 ```
 
