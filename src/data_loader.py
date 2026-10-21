@@ -12,12 +12,13 @@ HumanEvalFix-Java (evaluation only): 164 hand-written bugs from HumanEvalPack
 HumanEvalPack languages are still supported but not used (RESEARCH_LOG #39).
 
 HumanEval-Java (evaluation only): 163 single-method bugs with JUnit tests (Jiang et
-al., ICSE 2023; lin-tan/clm, BSD-3). The prompt is the buggy method alone, in the same
-format as Megadiff training pairs; the harness puts the predicted method back into
-the buggy class.
+al., ICSE 2023; lin-tan/clm, BSD-3). The prompt is the Megadiff training format with the
+original HumanEval problem description as a comment above the buggy method (#40);
+the harness puts the predicted method back into the buggy class.
 """
 
 import argparse
+import inspect
 import json
 import random
 import re
@@ -205,6 +206,31 @@ def load_humanevalfix(languages=HEF_LANGUAGES):
 _HEJ_PACKAGE = re.compile(r"^package humaneval\.\w+;", re.M)
 
 
+def _comment_text(body):
+    """Text of a /* */ or /** */ comment body, without leading '*' markers and common indentation."""
+    return inspect.cleandoc("\n".join(re.sub(r"^\s*\*(?!/) ?", "", l).rstrip() for l in body.splitlines()).strip("\n"))
+
+
+def humaneval_descriptions(hej_dir):
+    """HumanEval-Java task name -> docstring of the original HumanEval task.
+
+    Line i of humaneval_loc.txt is HumanEval/i (9 tasks were renamed, e.g. f -> FACTORIAL).
+    CORRECT_BRACKETING occurs twice (HumanEval/56 and /61); the Java task is /56 (the "<>"
+    version, as its source comment shows), so the first occurrence wins and /61 has no Java task.
+    """
+    root = Path(hej_dir)
+    problems = [json.loads(l) for l in open(root / "HumanEval.jsonl") if l.strip()]
+    names = [l.split()[0] for l in open(root / "src/main/java/humaneval/humaneval_loc.txt") if l.strip()]
+    assert len(names) == len(problems) == 164
+    out = {}
+    for name, p in zip(names, problems):
+        if name in out:
+            continue
+        m = re.search(rf"def {re.escape(p['entry_point'])}\(.*?(\"\"\"|\'\'\')(.*?)\1", p["prompt"], re.S)
+        out[name] = inspect.cleandoc(m.group(2)).replace("*/", "* /")
+    return out
+
+
 def load_humaneval_java(hej_dir):
     """HumanEval-Java records from a checkout of lin-tan/clm's `humaneval-java` folder.
 
@@ -214,6 +240,7 @@ def load_humaneval_java(hej_dir):
     """
     root = Path(hej_dir)
     meta = json.loads((root / "humaneval-java-sf.json").read_text())
+    originals = humaneval_descriptions(root)
     records = []
     for name in sorted(meta):
         m = meta[name]
@@ -222,14 +249,19 @@ def load_humaneval_java(hej_dir):
         method = "".join(buggy_class.splitlines(keepends=True)[m["begin"] - 1:m["end"]])
         assert method.expandtabs(4) == m["buggy"].expandtabs(4), name  # MAKE_A_PILE, WORDS_STRINGS: tabs in the file
         buggy = _method(method)
+        # Description: the comment above the class where the Java file has one (90 tasks; the authors
+        # adapted some to the Java tests, e.g. ADD_ELEMENTS, ANY_INT), else the HumanEval original (73)
+        comment = re.search(r"/\*(.*?)\*/", "".join(buggy_class.splitlines(keepends=True)[:m["begin"] - 1]), re.S)
+        description = _comment_text(comment.group(1)) if comment else originals[name]
         records.append({
             "id": f"HumanEval-Java/{name}",
             "language": "java",
             "benchmark": "humaneval_java",
             "name": name,
             "defective": HEJ_DEFECTIVE.get(name, ""),
-            "prompt": INSTRUCTION.format(buggy=buggy),
-            "buggy": buggy,
+            "description_source": "java_file" if comment else "humaneval",
+            "prompt": INSTRUCTION.format(buggy=f"/* {description} */\n{buggy}"),
+            "buggy": buggy,  # method only: the harness, the buggy sanity run and the contamination check use it
             "target": _method(m["fix"]),
             "buggy_class": buggy_class,
             "begin": m["begin"],

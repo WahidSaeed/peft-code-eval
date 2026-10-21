@@ -593,6 +593,30 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   3. **Megadiff in-task EM uses greedy decoding** (1 sample). Beam search (CodeXGLUE convention) is not used.
   4. **Batch size / memory at max_length 768** and the sampling batch: to be confirmed by the GPU dry run.
 
+### 40. Decisions: HumanEval-Java prompt gets a problem description; HumanEvalFix-Java keeps its standard prompt ✅
+- **User decisions (2026-10-21), items 1–2 at the end of #39:**
+  1. **Add a problem description to the HumanEval-Java prompt** ✅ (without one, bugs like `x | y` vs `x + y` can only be guessed from the method name).
+  2. **Keep the standard OctoPack-style HumanEvalFix-Java prompt** (whole class + example tests) ✅, so the untuned M0 can be checked against the published **52.2** pass@1 (StarCoder2 report, Table 12: DeepSeek-Coder-6.7B-Instruct, n = 20, T = 0.2).
+- **Where the descriptions come from:**
+  - **90 tasks:** the comment above the class in the Java file. The clm authors adapted some of these to the Java tests: ADD_ELEMENTS adds "the negative sign counts as a digit"; ANY_INT says the numbers are doubles that must convert to integers. Of the 90, 47 equal the HumanEval original (whitespace-normalised) and 43 differ.
+  - **73 tasks:** no comment in the file, so the original HumanEval docstring is used (`HumanEval.jsonl`, shipped in the clm folder).
+  - **Mapping:** line i of `humaneval_loc.txt` is HumanEval/i. Nine tasks were renamed (e.g. `f` → FACTORIAL, `maximum` → MAXIMUM_K). CORRECT_BRACKETING occurs twice (HumanEval/56 and /61); the Java task is /56 (its comment is the `<>` version), and /61 has no Java task, which is why there are 163 tasks, not 164.
+  - **Format:** `/* description */` directly above the buggy method, after the unchanged Megadiff instruction. The field `description_source` records `java_file` or `humaneval`.
+- **Known caveats (for the thesis):**
+  - Descriptions keep Python-style examples (`>>> add(2, 3)`, `True`, `[1, 2]`). The 90 Java-file comments use the same style.
+  - In the 73 HumanEval-sourced descriptions of renamed tasks, the function name can differ from the Java method (e.g. "Implement the function f" above `factorial`).
+  - Megadiff training methods never carry such a comment, a small format shift.
+  - Jiang et al. and Li et al. gave no description, so our HumanEval-Java numbers are **not directly comparable** with theirs.
+- **Checks:**
+  - Megadiff splits are **byte-identical** after the rebuild (md5); the contamination check still uses the method only.
+  - HumanEval-Java prompts now average 475 tokens (max 1,122), up from 347.
+  - Harness sanity re-run: reference fixes pass 100%, buggy code 0% on the clean set.
+- **Still open:** item 3 of #39 (greedy decoding for Megadiff Exact Match; explained to the user, awaiting confirmation) and item 4 (GPU dry run, blocked on the AWS quota, see #41).
+
+### 41. AWS quota appeal: no answer yet ⏳
+- 2026-10-21: G/VT quotas still 0 (On-Demand and Spot; eu-central-1 and us-east-1). The support case shows no AWS reply since the appeal (2026-10-20 17:37 CEST).
+- User decision: **wait for AWS**; RunPod stays backlog. The GPU dry run (batch size and memory at max_length 768) waits for the approval.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -604,4 +628,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 7. ~~Other HumanEvalPack languages~~ → added (#22), then dropped from the study: evaluation is Java only (#37, #39).
 6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis (now Megadiff + Java-only, pass@1/pass@10).
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
-9. Prompt formats and Megadiff decoding: the four items at the end of #39.
+9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Still open: greedy for Megadiff EM (#39 item 3); GPU dry run (#39 item 4, waits for AWS, #41).
