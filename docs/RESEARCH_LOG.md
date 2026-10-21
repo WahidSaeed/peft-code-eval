@@ -842,6 +842,16 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **To measure:** Java faulty→accepted pairs and their diff sizes; test-case completeness (`isValid`); problems needing special checkers (multiple valid outputs); problem dates vs DeepSeek-Coder's training cut-off (contamination).
 - Results to follow in this entry.
 
+### 59. Could the experiments run on the user's Mac? No ✅
+- **Asked by the user** (2026-10-22): how long would everything take on the local Mac instead of a cloud GPU?
+- **Machine:** Apple M1, 8 GB unified memory, 8 CPU cores, 8-core GPU.
+- **Answer: not slow but impossible**, for three reasons:
+  1. The 16-bit model's weights alone are 13.4 GB, more than the Mac's 8 GB of memory: M0 and M7–M9 can't even be loaded.
+  2. NF4 QLoRA and LLM.int8() (M1–M6) come from `bitsandbytes`, which needs CUDA (NVIDIA); Apple Silicon can't run them.
+  3. RQ2/RQ3 measure peak VRAM, speed and NVML energy on a 24 GB NVIDIA GPU; a Mac has unified memory and no CUDA memory or NVML energy counters, so its numbers wouldn't answer the research questions.
+- Running a GGUF 4-bit model through llama.cpp would be a different quantization method (not the one studied), inference only.
+- **The Mac's role:** data preparation, harness checks on reference code, analysis, writing. A rented NVIDIA GPU is required for training and evaluation.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
