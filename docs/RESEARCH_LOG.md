@@ -627,6 +627,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 ### 43. Methodology briefing removed ✅
 - `docs/methodology_briefing.md` (#33, #35) was written to discuss the open decoding and dataset questions. All of them are now decided (#37–#42), so at the user's request it was deleted. It remains in the git history.
 
+### 44. RQ wording updated in the research plan ✅
+- The research plan's RQs (§3) now match the decisions in #37–#42; the README table is in sync.
+  - **RQ1:** names both factors (bit-width **and** rank) and the metrics: pass@1 (primary) and pass@10 on HumanEvalFix-Java + HumanEval-Java, and EM / CodeBLEU / syntax on held-out Megadiff fixes, relative to the 16-bit adapters and M0. Replaces "AST compliance, CodeBLEU and patch test pass rates".
+  - **RQ2:** across bit-widths and ranks; "high-fidelity repair" → "test-verified repair quality".
+  - **RQ3:** "adapter target modules" → **adapter rank**: target modules are fixed (all linear layers), so they were never a factor. Energy (Wh) added, since it is measured.
+  - **RQ4:** the Pareto trade-off is defined as resource cost (VRAM, time, energy) vs. pass@1, instead of "functional code validity".
+- The rest of the plan (§4 benchmark: CodeXGLUE; §5 sequence length 512; §6A metrics; §7–§8 file names and schedule) is still the original text; see the README and this log for the current design.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -636,6 +644,6 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 4. Phase 0 reproduction: artifacts checked (#28). Li ✅, Huang ✅ (Drive), Wei ❌. Pick the scope from #28's proposal.
 5. GPU platform: **AWS A10G** if the appeal is approved; **RunPod RTX 4090 (backlog)** only if denied (#23).
 7. ~~Other HumanEvalPack languages~~ → added (#22), then dropped from the study: evaluation is Java only (#37, #39).
-6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis (now Megadiff + Java-only, pass@1/pass@10).
+6. ~~Second language~~ → HumanEvalFix added (#20). RQ wording updated in the plan (#44); the thesis text follows when written.
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). Still open: GPU dry run (#39 item 4, waits for AWS, #41).

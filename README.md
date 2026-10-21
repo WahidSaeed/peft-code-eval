@@ -8,10 +8,10 @@ Replication package for an MEng thesis (GISMA University of Applied Sciences, Be
 
 | RQ | Question |
 |---|---|
-| **RQ1** Correctness | How much does bit-width compression degrade the test pass rate (pass@1, pass@10), Exact Match, CodeBLEU and syntax validity of generated patches? |
-| **RQ2** Memory | What is the peak GPU VRAM during training and inference across ranks, and does high-fidelity repair fit a ≤ 24 GB consumer GPU? |
+| **RQ1** Correctness | How do bit-width and LoRA rank change the test-verified repair rate (pass@1 primary, pass@10) on HumanEvalFix-Java and HumanEval-Java, and Exact Match, CodeBLEU and syntax validity on held-out Megadiff fixes, relative to the 16-bit adapters and the zero-shot model (M0)? |
+| **RQ2** Memory | What is the peak GPU VRAM during training and inference across bit-widths and ranks, and can test-verified repair quality be reached within a ≤ 24 GB consumer GPU? |
 | **RQ3** Efficiency | How do precision and rank affect training throughput, time-to-first-token, generation throughput and energy? |
-| **RQ4** Decision framework | Which configuration is Pareto-optimal for developer workstations and CI pipelines? |
+| **RQ4** Decision framework | Which configurations are Pareto-optimal between resource cost (VRAM, time, energy) and pass@1, for developer workstations and CI pipelines? |
 
 ## Experimental design
 
