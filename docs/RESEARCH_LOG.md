@@ -789,6 +789,10 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - (a) Keep the descriptions as they are: renames count as failures, identically for all models.
   - (b) **Recommended:** in every description, replace the name of the function being fixed with the Java method's name (and its examples), and remove or translate references to helpers that don't exist in Java. Documented as a P1 refinement in the modifications table.
   - (c) Harness-side renaming of the prediction back to the expected name: rejected (too lenient; it would also accept genuinely wrong outputs).
+- **Worked example shown to the user (GET_CLOSET_VOWEL):** the benchmark file's own comment says `get_closest_vowel("yogurt") ==> "u"`; the method is `public static String get_closet_vowel(String word)`; the JUnit test calls `humaneval.buggy.GET_CLOSET_VOWEL.get_closet_vowel("yogurt")`. M0's sample 0 answered "The bug … is in the method name" and renamed the method, leaving the real bug (the loop bound `i >= 0` with `charAt(i - 1)`) unfixed, so that sample would fail even without the rename.
+- **Arguments for keeping the descriptions unchanged (option a):** it's the benchmark's own text (for most of these tasks); no intervention by us; identical for every model; renaming a public method breaks its callers, so it's a genuine repair mistake; the instruction asks for the *corrected method*, not a renamed one.
+- **Arguments against:** in these tasks the benchmark's text itself is inconsistent, which pushes models towards renaming; and the effect may differ between M0 and fine-tuned models (signature copying), which could bias the gain.
+- **Proposed before deciding:** measure the size of the effect with a diagnostic-only re-score of the saved M0 samples in which renamed methods are renamed back (not a harness rule, never used for reported results). If few renamed samples would pass anyway, option (a) costs almost nothing.
 
 ---
 
