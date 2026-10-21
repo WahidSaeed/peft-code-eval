@@ -34,7 +34,7 @@ JDK8_URL = "https://api.adoptium.net/v3/binary/latest/8/ga/linux/x64/jdk/hotspot
 
 image = (
     modal.Image.debian_slim(python_version="3.11")
-    .apt_install("git", "wget", "default-jdk-headless")
+    .apt_install("git", "wget", "default-jdk-headless", "unar")
     .run_commands(
         f"mkdir -p /opt/jdk8 && wget -qO- {JDK8_URL} | tar xz -C /opt/jdk8 --strip-components=1",
         f"git clone -q https://github.com/lin-tan/clm /opt/clm && git -C /opt/clm checkout -q {CLM_COMMIT}"
@@ -45,6 +45,7 @@ image = (
 )
 hf_cache = modal.Volume.from_name("thesis-hf-cache", create_if_missing=True)
 results = modal.Volume.from_name("thesis-results", create_if_missing=True)
+raw = modal.Volume.from_name("thesis-raw", create_if_missing=True)  # downloaded third-party archives (feasibility checks)
 app = modal.App("peft-code-eval")
 
 
@@ -74,7 +75,7 @@ def run(cmd: str, require_gpu: str = REQUIRED_GPU):
     return code
 
 
-@app.function(image=image, volumes={"/results": results}, cpu=8, memory=16384, timeout=6 * 3600)
+@app.function(image=image, volumes={"/results": results, "/raw": raw}, cpu=8, memory=16384, timeout=6 * 3600)
 def score(cmd: str):
     """CPU-only job for running unit tests on saved predictions (model-generated code runs here, not locally)."""
     env = {**os.environ, "HEJ_JAVA_HOME": "/opt/jdk8", "HEJ_LIB": "/opt/clm/humaneval-java/lib"}
@@ -83,6 +84,7 @@ def score(cmd: str):
         code = subprocess.run(["bash", "-c", f"{setup} && {cmd}"], env=env).returncode
     finally:
         results.commit()
+        raw.commit()
     return code
 
 

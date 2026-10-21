@@ -835,6 +835,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Assessment:** don't switch blindly. If the professor insists on the strict reading, the most useful role is an **additional journal-published, test-based Java benchmark** next to HumanEval-Java. Using it for training would turn the study into competitive programming.
 - **Proposed:** a CPU-only feasibility check like #38 (Java pair count and diff sizes, test completeness, special-checker share, problem dates vs DeepSeek-Coder's training cut-off), ~half a day. Awaiting the user's go-ahead.
 
+### 58. Code4Bench feasibility check 🔄
+- **User approved** the check proposed in #57 (2026-10-22).
+- **Where:** on a Modal CPU container, not the laptop (only ~9.6 GB free disk; memory pressure earlier). `scripts/modal_app.py`: the CPU `score` job gets `unar` and a new volume `thesis-raw` for downloaded third-party archives. (A 200 GB scratch-disk request was rejected by Modal, whose minimum is 512 GiB; the default disk is used.)
+- **Download:** `code4bench.rar` (636 MB, Zenodo record 2582968), verified against the published MD5 `3ae77dfabec6e7a97ca7608c1aa41c04`, extracted on the volume.
+- **To measure:** Java faulty→accepted pairs and their diff sizes; test-case completeness (`isValid`); problems needing special checkers (multiple valid outputs); problem dates vs DeepSeek-Coder's training cut-off (contamination).
+- Results to follow in this entry.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
