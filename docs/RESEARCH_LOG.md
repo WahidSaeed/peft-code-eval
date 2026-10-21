@@ -491,6 +491,23 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - HumanEval-Java: format and how its tests run.
 - ❓ Awaiting the user.
 
+### 37. Discussion: user proposal "Megadiff + HumanEvalFix-Java only + pass@10" ❓
+- **User proposal:** train on Megadiff, evaluate only on HumanEvalFix-Java, so the study is Java-only and pass@10 becomes affordable.
+- **Assistant analysis:**
+  - **Strengths:**
+    - Coherent Java-only story: removes Problem 2.
+    - Sampling becomes cheap (164 tasks instead of 984), so Problem 1 is largely settled.
+    - pass@10 matches the Java APR literature (Li; Machácek; Vallecillos-Ruiz).
+  - **Concerns:**
+    1. **pass@10 is less sensitive to quantization damage** (ceiling compression: untuned Instruct is already 52.2 pass@1 on HumanEvalFix-Java per StarCoder2). Proposal: draw n samples once (e.g. n = 20, T = 0.2) and report **pass@1 (primary) and pass@10 (secondary) from the same samples**, at no extra cost (Codex unbiased estimator).
+    2. **Statistical power with 164 problems:** paired differences of a few points will be hard to detect. Equivalence margin likely ±5 pp, not ±3.
+    3. **Format gap remains, smaller:** Megadiff is real-project code; HumanEvalFix problems are small algorithmic functions. Defects4J would match better but is too heavy with 10+ samples × 16 models.
+    4. **Option to add HumanEval-Java** (Jiang et al.): 164 more test-based Java bugs on the same problems with different bugs. Gives direct comparability with Li / Machácek / Vallecillos-Ruiz and more power (correlated, not independent). Costs a second Java harness.
+    5. **Dropping the other 5 languages is a scope reduction** (relevant to the no-cuts rule); the user's call.
+    6. **Decoding for RQ3:** keep the existing greedy batch-size-1 probe for latency, VRAM and energy, separate from the sampled accuracy runs.
+    7. **In-task similarity:** EM / CodeBLEU / syntax on a held-out Megadiff test split replaces CodeXGLUE's.
+- ❓ Awaiting the user. Feasibility check (#36) still pending.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
