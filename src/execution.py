@@ -127,7 +127,26 @@ def run_python(code, record, timeout):
 
 # ----------------------------------------------------------------------------- java
 
+_JAVA_IMPORT = re.compile(r"^\s*import\s+(static\s+)?[\w.]+(\.\*)?\s*;[ \t]*\n?", re.M)
+
+
+def _drop_java_class(code, name):
+    """Remove a top-level `class <name> { ... }` block (brace-matched) from model output."""
+    m = re.search(rf"^[ \t]*(public\s+)?(final\s+)?class\s+{name}\b[^{{]*\{{", code, re.M)
+    if not m:
+        return code
+    depth, i = 1, m.end()
+    while i < len(code) and depth:
+        depth += {"{": 1, "}": -1}.get(code[i], 0)
+        i += 1
+    return code[:m.start()] + code[i:]
+
+
 def run_java(code, record, timeout):
+    # A model often copies the example test's `Main` class; the hidden tests bring their own `Main`.
+    # The reference harness (bigcode-evaluation-harness) also never runs a model-written main:
+    # it truncates generations before `public static void main` (RESEARCH_LOG #50).
+    code = _drop_java_class(code, "Main")
     code = _with_header(code, record, "class Solution")
     if "import java.util" not in code:
         code = JAVA_IMPORTS + code
@@ -289,8 +308,13 @@ def run_humaneval_java(code, record, timeout):
         code = re.sub(r"^package [\w.]+;", "", code, count=1, flags=re.M)
         source = "package humaneval.buggy;\n" + code
     else:
+        # imports in a predicted method are moved to the top of the file, where Java allows them (#50)
+        imports = [m.group(0).strip() for m in _JAVA_IMPORT.finditer(code)]
+        code = _JAVA_IMPORT.sub("", code)
         lines = record["buggy_class"].splitlines(keepends=True)
-        source = "".join(lines[:record["begin"] - 1]) + code + "\n" + "".join(lines[record["end"]:])
+        new = [i + "\n" for i in dict.fromkeys(imports) if i not in record["buggy_class"]]
+        head = lines[:1] + new + lines[1:record["begin"] - 1]  # line 1 is the package declaration
+        source = "".join(head) + code + "\n" + "".join(lines[record["end"]:])
     cp = ":".join(str(j.resolve()) for j in sorted(HEJ_LIB.glob("*.jar")))
     if not cp:
         raise RuntimeError(f"no JUnit jars in {HEJ_LIB} (set HEJ_LIB)")

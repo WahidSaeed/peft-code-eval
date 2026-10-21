@@ -74,6 +74,18 @@ def run(cmd: str, require_gpu: str = REQUIRED_GPU):
     return code
 
 
+@app.function(image=image, volumes={"/results": results}, cpu=8, memory=16384, timeout=6 * 3600)
+def score(cmd: str):
+    """CPU-only job for running unit tests on saved predictions (model-generated code runs here, not locally)."""
+    env = {**os.environ, "HEJ_JAVA_HOME": "/opt/jdk8", "HEJ_LIB": "/opt/clm/humaneval-java/lib"}
+    setup = "cd /root/repo && ln -sfn /results results && ln -sfn /opt/clm data/clm"
+    try:
+        code = subprocess.run(["bash", "-c", f"{setup} && {cmd}"], env=env).returncode
+    finally:
+        results.commit()
+    return code
+
+
 @app.local_entrypoint()
 def main(cmd: str = "bash scripts/dry_run.sh"):
     print(f"GPU: {GPU} (require {REQUIRED_GPU}) | command: {cmd}")
