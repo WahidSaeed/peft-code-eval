@@ -611,11 +611,18 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Megadiff splits are **byte-identical** after the rebuild (md5); the contamination check still uses the method only.
   - HumanEval-Java prompts now average 475 tokens (max 1,122), up from 347.
   - Harness sanity re-run: reference fixes pass 100%, buggy code 0% on the clean set.
-- **Still open:** item 3 of #39 (greedy decoding for Megadiff Exact Match; explained to the user, awaiting confirmation) and item 4 (GPU dry run, blocked on the AWS quota, see #41).
+- **Still open:** item 3 of #39 (→ decided in #42) and item 4 (GPU dry run, blocked on the AWS quota, see #41).
 
 ### 41. AWS quota appeal: no answer yet ⏳
 - 2026-10-21: G/VT quotas still 0 (On-Demand and Spot; eu-central-1 and us-east-1). The support case shows no AWS reply since the appeal (2026-10-20 17:37 CEST).
 - User decision: **wait for AWS**; RunPod stays backlog. The GPU dry run (batch size and memory at max_length 768) waits for the approval.
+
+### 42. Decision: greedy decoding for Megadiff Exact Match ✅
+- **User decision (2026-10-21), item 3 of #39:** the Megadiff test split is decoded **greedily (1 answer per bug)** and scored with Exact Match, CodeBLEU and syntax validity.
+- **Why pass@k is not possible there:** a Megadiff pair is only the method before and after a commit. There is no project to compile against and no tests, so there's nothing to count passes with; pass@k needs an executable check.
+- **Why greedy, not beam search or "EM in any of 10":** EM grades one answer per bug, as it's reported in the literature. Taking the best of several samples would inflate lucky textual matches, while correct fixes that are written differently still count as wrong. Beam 5 (the CodeXGLUE convention) was tied to the old dataset and costs ~5× the decoding.
+- **RQ1 metrics, final:** pass@1 (primary) and pass@10 on HumanEvalFix-Java + HumanEval-Java (n = 20, T = 0.2, top-p 0.95); EM / CodeBLEU / syntax on the Megadiff test split (greedy) as an in-task check.
+- **No code change:** `evaluator.py` already decodes Megadiff greedily (`N_SAMPLES["megadiff"] = 1`).
 
 ---
 
@@ -628,4 +635,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 7. ~~Other HumanEvalPack languages~~ → added (#22), then dropped from the study: evaluation is Java only (#37, #39).
 6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis (now Megadiff + Java-only, pass@1/pass@10).
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
-9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Still open: greedy for Megadiff EM (#39 item 3); GPU dry run (#39 item 4, waits for AWS, #41).
+9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). Still open: GPU dry run (#39 item 4, waits for AWS, #41).
