@@ -705,6 +705,16 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Threats and mitigations:** absolute speed and energy are specific to the card → conclusions rest on relative comparisons on identical hardware; usable memory ~22 GiB → conservative, and the exact figure is reported; A10/A10G mixing on one platform → `gpu_name` is logged per run and must be pinned.
 - **To do before submission:** take spec figures (bandwidth, board power, compute) from NVIDIA's official datasheets and cite them; consistently use the wording "24 GB-class GPU".
 
+### 49. Pinned versions, one-board rule enforced, split IDs published; Modal hands out A10, not A10G ⚠️
+- **User's plan (2026-10-21):** use the remaining Modal credit ($27.41) to keep going; move to AWS if the appeal is approved, otherwise pay for the rest. Conditions agreed first (one GPU model, identical software, spend limit, resumable long runs).
+- **Done:**
+  - `requirements.lock.txt`: exact versions frozen from the Modal image (Python 3.11; torch 2.14.1, transformers 5.20.2, peft 0.21.2, bitsandbytes 0.50.2, accelerate 1.15.0, datasets 5.1.0, codebleu 0.7.0). The Modal image installs from it; any other host must too.
+  - `scripts/modal_app.py`: each job states the one GPU board it accepts and raises (so Modal retries in a fresh container) on any other; job timeout 24 h; every job appends board name, driver, power limit and memory to `results/platform_log.csv`; a failing command returns its exit code instead of being retried.
+  - `splits/`: row indices of the Megadiff train / validation / test splits and SHA-256 checksums of all five generated data files (the data itself isn't redistributed).
+  - Thesis drafts (outside this repo): a dataset-modifications subsection with a table of all 11 changes (D1–D6, E1–E4, P1), following the user's question whether altering official datasets is acceptable (answer: yes, if every change is documented, deterministic, applied identically, limited to objective defects in evaluation data, and reported alongside the unmodified version).
+- ⚠️ **Finding:** the first M0 job requiring an A10G was refused 6 times in a row (first attempt + 5 retries): Modal's "A10" type returned an **NVIDIA A10** every time. An A10G can't be obtained reliably on Modal, so "start on Modal, continue on AWS" would mix GPU models.
+- **User decision (option B):** wait for the AWS answer (check on 2026-10-22, 10:13). Meanwhile run M0 on Modal's A10 as a **labelled harness check** (`results/pilot/`, run name `M0_pilotA10`): correctness metrics don't depend on the board, so it validates the harness against the published 52.2 (HumanEvalFix-Java, DeepSeek-Coder-6.7B-Instruct). Its speed and energy numbers are **not** official. If AWS approves → all official runs on the A10G there; if not → all official runs on Modal's A10 (the hardware subsection then says A10).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
