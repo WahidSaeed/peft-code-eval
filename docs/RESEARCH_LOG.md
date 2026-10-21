@@ -680,6 +680,20 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **Total ≈ 170–200 GPU-h (~$190–240)**, up from 110–150 (#38). It still fits the $700 AWS credit; it needs about 7–8 days of continuous GPU time on one card, which puts pressure on the schedule (§8 of the plan).
 - ❓ **For the user:** the platform for the official runs (AWS A10G if approved; Modal with GPU-name pinning; another provider), given the higher estimate and the deadline.
 
+### 47. Which GPUs do the related papers use? ✅
+- Checked each paper's implementation-details section:
+
+| Paper | Hardware | Note |
+|---|---|---|
+| Weyssow et al., TOSEM 2025 (PEFT/QLoRA for code generation) | **1× NVIDIA RTX A5000, 24 GB** | Explicitly designs for "a single 24GB GPU"; models chosen to fit it |
+| Huang et al., TSE 2025 (fine-tuning LLMs for APR) | RTX 3090 24 GB (small models); **Tesla A100 80 GB** (billion-scale, 8-bit QLoRA) | |
+| Li et al., ASE 2024 (PEFT for APR) | **1× A800 80 GB** | |
+| Wei et al., FSE 2023 (quantized code generation) | AWS p3dn.24xlarge (V100s) + a MacBook Pro | Inference only |
+| Vallecillos-Ruiz et al., ICSME 2026 (quantization for APR) | HPC cluster, **NVIDIA GH200** | Post-training quantization, inference only |
+
+- **There is no standard GPU.** The closest PEFT study (Weyssow) uses a single 24 GB data-centre card of the same class as our A10G, so one 24 GB GPU is well precedented for the "consumer-budget" framing. The APR fine-tuning papers use 80 GB cards because they don't study memory limits.
+- **Consequence:** report the exact GPU model in the thesis; a 24 GB card is the faithful choice for RQ2. A larger card capped at 24 GiB is defensible but second best.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
