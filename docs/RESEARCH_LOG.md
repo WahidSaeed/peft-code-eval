@@ -715,6 +715,34 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - ⚠️ **Finding:** the first M0 job requiring an A10G was refused 6 times in a row (first attempt + 5 retries): Modal's "A10" type returned an **NVIDIA A10** every time. An A10G can't be obtained reliably on Modal, so "start on Modal, continue on AWS" would mix GPU models.
 - **User decision (option B):** wait for the AWS answer (check on 2026-10-22, 10:13). Meanwhile run M0 on Modal's A10 as a **labelled harness check** (`results/pilot/`, run name `M0_pilotA10`): correctness metrics don't depend on the board, so it validates the harness against the published 52.2 (HumanEvalFix-Java, DeepSeek-Coder-6.7B-Instruct). Its speed and energy numbers are **not** official. If AWS approves → all official runs on the A10G there; if not → all official runs on Modal's A10 (the hardware subsection then says A10).
 
+### 50. M0 harness check on Modal's A10: results, two Java harness bugs, fixes, re-scoring 🔄
+- **Run:** `M0_pilotA10` (untuned DeepSeek-Coder-6.7B-Instruct, 16-bit), NVIDIA A10, 2026-10-21 ~17:20–21:50 CEST, Modal job `fc-01M5FGXG9MVCFJ8HXBBTWQBXNP`. Outputs in `results/pilot/` on the Modal volume. **Not an official result** (wrong board for the official runs; see #49): a correctness check of the harness against the published 52.2.
+- The local process watching the job was killed by Claude Code when the Mac ran low on memory (~18:00); the Modal job wasn't affected (server-side spawn, #46). Progress was checked by hand afterwards.
+- **Generation** (A10; speed and energy indicative only):
+
+| Benchmark | Records × samples | Duration | Peak VRAM alloc | Hit max_new_tokens | Energy |
+|---|---|---|---|---|---|
+| Megadiff test (greedy) | 1,000 × 1 | 36 min | 17.3 GiB | 14 | 89.7 Wh |
+| HumanEvalFix-Java | 164 × 20 | 99 min | 19.7 GiB | 0 | 245.8 Wh |
+| HumanEval-Java | 163 × 20 | 84 min | 18.9 GiB | 6 | 208.3 Wh |
+
+- **Scores as first measured (harness v1):**
+
+| Benchmark | pass@1 | pass@10 | Other |
+|---|---|---|---|
+| HumanEvalFix-Java | **44.42%** (published 52.2) | 70.06% | compile_error 508 / 3,280 samples |
+| HumanEval-Java (all 163 / clean 162) | 59.79% / 59.78% | 76.87% / 76.73% | compile_error 554 / 3,260 |
+| Megadiff test | — | — | EM 3.1%, CodeBLEU 0.741 (naive copy 0.876), syntax validity 87.1% |
+
+- ⚠️ **Two harness bugs found by classifying the compile errors:**
+  1. **HumanEvalFix-Java, 461 of 508 compile errors: `duplicate class: Main`.** The model copies the example test's `Main` class into its answer; the harness appended the hidden test's `Main` as well. The reference harness for the published number (bigcode-evaluation-harness, `humanevalpack.py`) never runs a model-written main: it truncates Java generations before `public static void main`. **Fix:** a top-level `class Main { … }` block in the model output is removed (brace-matched) before the tests are added.
+  2. **HumanEval-Java, ~330 of 554 compile errors: `illegal start of type` etc.** from `import …;` lines the model puts above its method. When the method is spliced into the class, the import lands mid-file, where Java forbids it. **Fix:** import lines in a spliced prediction are moved to the top of the file (after the package line), skipping ones the class already has.
+  - Both rules apply identically to every model and to the reference fixes. The remaining compile errors (type errors, methods defined twice, missing symbols) are model mistakes and stay counted as failures.
+- **Harness re-validation after the fixes** (reference code only, on the Mac): HumanEvalFix-Java reference 100% / buggy 0%. HumanEval-Java reference 99.38% on the first run (1 task timed out under 8 parallel workers while the Mac was low on memory; JUnit's 3 s limit) and **163/163 on the re-run**; buggy 0% on the clean set.
+- **Also new:** a CPU-only `score` job in `scripts/modal_app.py` (8 vCPU, 16 GB, no GPU) to run unit tests on saved predictions, since model-generated code isn't run on the laptop.
+- 🔄 **Re-scoring:** the **same saved samples** (no new generation) re-scored with harness v2 on Modal CPU, job `fc-01M5G29DKF97QXM34GTYBYDZSZ`, started ~22:40 CEST → `results/pilot/M0_pilotA10_tests_v2.json`. Results to follow in this entry; v1 numbers above are kept for transparency.
+- **Other actions today (2026-10-21):** hourly Vultr ticket check stopped at the user's request (the user follows the ticket); Modal spend limit not yet set (asked the user, $27.41 credit before M0); commits `cfce1b8` (harness fixes + scoring job).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
