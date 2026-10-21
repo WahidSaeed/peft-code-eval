@@ -715,7 +715,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - ⚠️ **Finding:** the first M0 job requiring an A10G was refused 6 times in a row (first attempt + 5 retries): Modal's "A10" type returned an **NVIDIA A10** every time. An A10G can't be obtained reliably on Modal, so "start on Modal, continue on AWS" would mix GPU models.
 - **User decision (option B):** wait for the AWS answer (check on 2026-10-22, 10:13). Meanwhile run M0 on Modal's A10 as a **labelled harness check** (`results/pilot/`, run name `M0_pilotA10`): correctness metrics don't depend on the board, so it validates the harness against the published 52.2 (HumanEvalFix-Java, DeepSeek-Coder-6.7B-Instruct). Its speed and energy numbers are **not** official. If AWS approves → all official runs on the A10G there; if not → all official runs on Modal's A10 (the hardware subsection then says A10).
 
-### 50. M0 harness check on Modal's A10: results, two Java harness bugs, fixes, re-scoring 🔄
+### 50. M0 harness check on Modal's A10: results, two Java harness bugs, fixes, re-scoring ✅
 - **Run:** `M0_pilotA10` (untuned DeepSeek-Coder-6.7B-Instruct, 16-bit), NVIDIA A10, 2026-10-21 ~17:20–21:50 CEST, Modal job `fc-01M5FGXG9MVCFJ8HXBBTWQBXNP`. Outputs in `results/pilot/` on the Modal volume. **Not an official result** (wrong board for the official runs; see #49): a correctness check of the harness against the published 52.2.
 - The local process watching the job was killed by Claude Code when the Mac ran low on memory (~18:00); the Modal job wasn't affected (server-side spawn, #46). Progress was checked by hand afterwards.
 - **Generation** (A10; speed and energy indicative only):
@@ -740,7 +740,16 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Both rules apply identically to every model and to the reference fixes. The remaining compile errors (type errors, methods defined twice, missing symbols) are model mistakes and stay counted as failures.
 - **Harness re-validation after the fixes** (reference code only, on the Mac): HumanEvalFix-Java reference 100% / buggy 0%. HumanEval-Java reference 99.38% on the first run (1 task timed out under 8 parallel workers while the Mac was low on memory; JUnit's 3 s limit) and **163/163 on the re-run**; buggy 0% on the clean set.
 - **Also new:** a CPU-only `score` job in `scripts/modal_app.py` (8 vCPU, 16 GB, no GPU) to run unit tests on saved predictions, since model-generated code isn't run on the laptop.
-- 🔄 **Re-scoring:** the **same saved samples** (no new generation) re-scored with harness v2 on Modal CPU, job `fc-01M5G29DKF97QXM34GTYBYDZSZ`, started ~22:40 CEST → `results/pilot/M0_pilotA10_tests_v2.json`. Results to follow in this entry; v1 numbers above are kept for transparency.
+- ✅ **Re-scoring:** the **same saved samples** (no new generation) re-scored with harness v2 on Modal CPU, job `fc-01M5G29DKF97QXM34GTYBYDZSZ` (~22:40–23:00 CEST) → `results/pilot/M0_pilotA10_tests_v2.json`. The v1 numbers above are kept for transparency. The result was opened only after the acceptance rule (#52) was committed.
+
+| Benchmark | pass@1 v1 → **v2** | pass@10 v1 → v2 | compile_error v1 → v2 |
+|---|---|---|---|
+| HumanEvalFix-Java | 44.42 → **53.11%** | 70.06 → 72.01% | 508 → 47 |
+| HumanEval-Java (all / clean) | 59.79 / 59.78 → **64.79 / 64.69%** | 76.87 / 76.73 → 81.94 / 81.82% | 554 → 291 |
+
+  - **HumanEvalFix-Java: 53.11% vs the published 52.2 (+0.9 pp), inside the ±6 pp band of #52 → harness validated.**
+  - Remaining HumanEvalFix-Java compile errors (47) are model mistakes: broken `switch` syntax, type errors, a public `Solution` class.
+  - HumanEval-Java: 122 of the remaining 291 compile errors are `cannot find symbol`, and most come from **the problem descriptions, not the model or the harness**; see #53.
 - **Other actions today (2026-10-21):** hourly Vultr ticket check stopped at the user's request (the user follows the ticket); Modal spend limit not yet set (asked the user, $27.41 credit before M0); commits `cfce1b8` (harness fixes + scoring job).
 
 ### 51. Terminology: what the "test harness" is ✅
@@ -769,6 +778,17 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   3. **Any further harness change must be justified on its own terms** (it fixes a demonstrable defect, matches the reference harness, and passes the 100% / 0% check). It is never justified by moving the score towards 52.2.
 - **Why a high score would be suspicious:** a harness that's too lenient (false passes) inflates every model equally, hiding real differences between configurations. A score above the reference therefore needs the same scrutiny as one below.
 - **Why it matters less than it seems:** M0 is a baseline. The thesis's conclusions rest on differences between configurations, all scored by the same harness, so a constant protocol offset affects every model alike.
+
+### 53. HumanEval-Java descriptions name functions differently from the Java methods ⚠️ ❓
+- **Found while checking the remaining compile errors of #50 (v2).** 122 HumanEval-Java samples fail with `cannot find symbol`, concentrated on a few tasks: GET_CLOSET_VOWEL 20, MIN_SUBARRAY_SUM 18, MATCH_PARENS 13, FIND_ZERO 11, SORTED_LIST_SUM 9, DECODE_CYCLIC 8.
+- **Cause 1, renamed methods:** the description uses another name for the function than the Java method the tests call, and the model "corrects" the method name to match, so the tests no longer find it. Examples: `get_closest_vowel` vs `get_closet_vowel`; `minSubArraySum` vs `min_subarray_sum`; `digitSum` vs `digit_sum`; `words_string` vs `words_strings`; `sort_array` vs `sort_array_binary`; `triangle_area` vs `triangle_area_2`; `list_sort` vs `sorted_list_sum`; `specialFilter`, `Strongest_Extension`, `solve` vs the Java names.
+  - **Most of these come from the benchmark's own Java-file comments** (e.g. GET_CLOSET_VOWEL, MIN_SUBARRAY_SUM, WORDS_STRINGS), not only from the HumanEval fallback descriptions (P1, #40). An automatic scan flagged 22 tasks; about 12 are real name mismatches (the rest are words like `len(`, `range(` in examples).
+- **Cause 2, helper functions:** some descriptions mention Python helpers that don't exist in the Java class (likely for FIND_ZERO, DECODE_CYCLIC, MATCH_PARENS), and the model calls them. To be confirmed task by task.
+- **Why it matters for the comparison:** fine-tuned models trained on Megadiff (method in → same method out) are likely to keep the signature, while M0 renames. That would inflate the measured gain from fine-tuning for a reason that has nothing to do with repair ability.
+- ❓ **Decision for the user** (prompt design P1; no official run is affected yet):
+  - (a) Keep the descriptions as they are: renames count as failures, identically for all models.
+  - (b) **Recommended:** in every description, replace the name of the function being fixed with the Java method's name (and its examples), and remove or translate references to helpers that don't exist in Java. Documented as a P1 refinement in the modifications table.
+  - (c) Harness-side renaming of the prediction back to the expected name: rejected (too lenient; it would also accept genuinely wrong outputs).
 
 ---
 
