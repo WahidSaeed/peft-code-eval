@@ -801,6 +801,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **Recommendation:** option (a), keep the benchmark's descriptions unchanged; report this diagnostic in the threats-to-validity chapter. Awaiting the user's decision.
 
 
+### 54. Why a widely used benchmark can contain defects ✅
+- **Asked by the user:** how can a dataset used by many published papers have mistakes?
+- **Defects in popular benchmarks are well documented:** EvalPlus (Liu et al., NeurIPS 2023) showed that HumanEval's tests are often too weak, so wrong solutions pass; Defects4J keeps an official list of deprecated bugs; Northcutt et al. (NeurIPS 2021) found label errors in the test sets of ten widely used datasets (incl. ImageNet). In this project: CodeXGLUE's broken reference syntax (#9), HumanEvalFix's defective tasks (#22). Wide use means convenient and comparable, not audited. **[TODO: verify these citations before using them in the thesis.]**
+- **Why prior work didn't hit the name mismatch (#53):** HumanEval-Java was made by translating Python HumanEval to Java. Class comments were copied from the Python docstrings (`get_closest_vowel`), the Java methods were written by hand (`get_closet_vowel`, a typo), and the tests call the Java names. Jiang et al. and Li et al. prompted with the buggy method only, without the comment (#40), so the inconsistency never reached their models. It affects us because we add the description to the prompt. It does **not** invalidate their results.
+- **Defects that did affect everyone:** `ISCUBE` (buggy file identical to the fix: a free pass for any model returning the code unchanged, inflating all scores equally); `GET_ROW` (swapped package lines; effect depends on the build setup).
+- **For the thesis:** report the defects found (Table 3.d) as rigour; optionally report them upstream (GitHub issue on lin-tan/clm, only with the user's approval since it's a public post).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
