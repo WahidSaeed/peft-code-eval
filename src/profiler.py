@@ -124,6 +124,17 @@ class GPUProfiler:
         return False
 
 
+def cap_vram(gib, device=0):
+    """Limit PyTorch's allocator to `gib` GiB on a larger GPU, so a run that would not fit
+    a consumer card (e.g. 24 GB) fails with OOM here too. Returns the fraction set, or None."""
+    if not gib or not torch.cuda.is_available():
+        return None
+    total = torch.cuda.get_device_properties(device).total_memory
+    fraction = min(1.0, gib * GIB / total)
+    torch.cuda.set_per_process_memory_fraction(fraction, device)
+    return round(fraction, 4)
+
+
 def _sync():
     if torch.cuda.is_available():
         torch.cuda.synchronize()

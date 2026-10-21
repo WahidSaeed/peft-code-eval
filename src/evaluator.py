@@ -37,7 +37,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, set_seed
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from data_loader import DEFAULT_MODEL, HEF_LANGUAGES, chat_prompt  # noqa: E402
-from profiler import GPUProfiler, append_csv, measure_generation  # noqa: E402
+from profiler import GPUProfiler, append_csv, cap_vram, measure_generation  # noqa: E402
 from trainer import quantization_config  # noqa: E402
 
 # Longest reference fix + margin (DeepSeek tokenizer, RESEARCH_LOG #39):
@@ -178,6 +178,8 @@ def parse_args(argv=None):
     p.add_argument("--limit", type=int, help="first N records per file (debugging)")
     p.add_argument("--score", action="store_true", help="score Megadiff inline (EM, CodeBLEU, syntax; first sample)")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--max_vram_gib", type=float,
+                   help="cap PyTorch GPU memory (e.g. 24 on a 48 GB card, to emulate a 24 GB GPU)")
     args = p.parse_args(argv)
     args.max_new_tokens = args.max_new_tokens or MAX_NEW_TOKENS[args.benchmark]
     args.n_samples = args.n_samples or N_SAMPLES[args.benchmark]
@@ -187,6 +189,7 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
     set_seed(args.seed)
+    vram_fraction = cap_vram(args.max_vram_gib)
     tokenizer = AutoTokenizer.from_pretrained(args.adapter or args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
@@ -245,6 +248,7 @@ def main(argv=None):
         "gen_energy_wh": p.get("energy_wh"),
         **latency,
         "gpu_name": p.get("gpu_name"),
+        "vram_cap_gib": args.max_vram_gib if vram_fraction else None,
         "predictions": str(pred_path),
     }
     if args.score and args.benchmark == "megadiff":

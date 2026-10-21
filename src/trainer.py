@@ -36,7 +36,7 @@ from transformers import (
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from data_loader import DEFAULT_MODEL, IGNORE_INDEX, tokenize_for_training  # noqa: E402
-from profiler import GPUProfiler, append_csv, trainable_parameters  # noqa: E402
+from profiler import GPUProfiler, append_csv, cap_vram, trainable_parameters  # noqa: E402
 
 # "All linear" layers of a LLaMA-style decoder (DeepSeek-Coder): attention + MLP
 TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
@@ -136,6 +136,8 @@ def parse_args(argv=None):
     p.add_argument("--data_dir", default="data")
     p.add_argument("--subset", default="megadiff", help="data file prefix: <subset>_{train,validation}.jsonl")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--max_vram_gib", type=float,
+                   help="cap PyTorch GPU memory (e.g. 24 on a 48 GB card, to emulate a 24 GB GPU)")
     p.add_argument("--max_steps", type=int, default=-1, help="optimizer steps; > 0 overrides epochs (dry runs)")
     p.add_argument("--train_limit", type=int, help="use only the first N training examples (debugging)")
     p.add_argument("--eval_limit", type=int, help="use only the first N validation examples (debugging)")
@@ -153,6 +155,7 @@ def parse_args(argv=None):
 def main(argv=None):
     args = parse_args(argv)
     set_seed(args.seed)
+    vram_fraction = cap_vram(args.max_vram_gib)
     out = Path(args.output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
@@ -255,6 +258,7 @@ def main(argv=None):
         "final_train_loss": round(train_output.training_loss, 4),
         "eval_loss_per_eval": json.dumps([round(x, 4) for x in eval_losses]),
         "gpu_name": p.get("gpu_name"),
+        "vram_cap_gib": args.max_vram_gib if vram_fraction else None,
     }
     config = {"args": vars(args), "fixed_defaults": FIXED, "target_modules": TARGET_MODULES,
               "versions": _versions(), "result": row}

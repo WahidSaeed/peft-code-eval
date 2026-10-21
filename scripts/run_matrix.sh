@@ -4,6 +4,7 @@
 #   bash scripts/run_matrix.sh M1 M5      # selected cells
 #   DRY_RUN=50 bash scripts/run_matrix.sh M1   # 50-step dry run into results/runs/dry_<cell>
 #   SEEDS="43 44" bash scripts/run_matrix.sh M2 M5 M8   # extra seeds -> results/runs/<cell>_s<seed>
+#   MAX_VRAM_GIB=24 bash scripts/run_matrix.sh   # cap PyTorch memory, e.g. 24 GiB on a 48 GB card
 # Main runs use seed 42 (results/runs/<cell>). The data split always uses seed 42, so every
 # seed trains and tests on identical data; the training seed varies LoRA init, dropout and data order.
 # A cell whose adapter already exists is skipped, so the script can be re-run after a crash.
@@ -32,6 +33,6 @@ for cell in "${CELLS[@]}"; do
     echo "== $name: bits=${BITS[$cell]} rank=${RANK[$cell]} seed=$seed -> $out  ($(date -Is))"
     mkdir -p "$out"
     python src/trainer.py --bits "${BITS[$cell]}" --rank "${RANK[$cell]}" --seed "$seed" --run_name "$name" \
-      --output_dir "$out" "${extra[@]}" 2>&1 | tee "$out/train.log"
+      --output_dir "$out" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} "${extra[@]}" 2>&1 | tee "$out/train.log"
   done
 done
