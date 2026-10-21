@@ -827,6 +827,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - Content: why CodeXGLUE was dropped (abstracted code, no tests, naive copy 0.887 CodeBLEU, Java-only vs six languages); the proposed datasets with their venues; the RepairLLaMA IEEE TSE 2025 precedent; the question whether "published in a journal" means (a) introduced in a journal paper or (b) peer-reviewed/established and used in journal research.
 - To check before sending: the RepairLLaMA DOI on IEEE Xplore.
 
+### 57. Candidate dataset: Code4Bench (journal-published) ❓
+- **Raised by the user (2026-10-22)**, after emailing the professor about #55 (the user will report the reply).
+- **Facts checked:** Code4Bench (Majd et al., *Journal of Computer Languages*, vol. 53, pp. 38–52, 2019 **[TODO: verify year and DOI on ScienceDirect]**); Zenodo 10.5281/zenodo.2582968, CC BY 4.0, 636 MB database dump. Codeforces submissions: ~3.4 M programs, 28 languages, **~205k Java** (Java 6/7/8). Tables include `testcases` (input / expected output per problem, with an `isValid` flag for incomplete tests) and `Realfaultslocations` (faulty submission → accepted submission, with localised faults).
+- **Strengths:** journal-published (meets the strict reading of #55); executable tests (pass@k possible); real human bugs; open licence; pairs and tests in one dataset.
+- **Risks:** (1) **contamination**: Codeforces solutions are widely published online, so DeepSeek-Coder likely saw many in pre-training; (2) competitive-programming stdin/stdout programs, not methods in software projects (Defects4C calls such bugs "simplified"); (3) a wrong→accepted pair may be a rewrite, not a small fix; (4) problems with multiple valid outputs (special checkers) and truncated tests break exact output comparison; (5) no use in LLM APR research found, so no published reference number; (6) ~2–3 days of loader + harness work.
+- **Assessment:** don't switch blindly. If the professor insists on the strict reading, the most useful role is an **additional journal-published, test-based Java benchmark** next to HumanEval-Java. Using it for training would turn the study into competitive programming.
+- **Proposed:** a CPU-only feasibility check like #38 (Java pair count and diff sizes, test completeness, special-checker share, problem dates vs DeepSeek-Coder's training cut-off), ~half a day. Awaiting the user's go-ahead.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
