@@ -779,7 +779,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Why a high score would be suspicious:** a harness that's too lenient (false passes) inflates every model equally, hiding real differences between configurations. A score above the reference therefore needs the same scrutiny as one below.
 - **Why it matters less than it seems:** M0 is a baseline. The thesis's conclusions rest on differences between configurations, all scored by the same harness, so a constant protocol offset affects every model alike.
 
-### 53. HumanEval-Java descriptions name functions differently from the Java methods ⚠️ ❓
+### 53. HumanEval-Java descriptions name functions differently from the Java methods ⚠️ ✅ decided
 - **Found while checking the remaining compile errors of #50 (v2).** 122 HumanEval-Java samples fail with `cannot find symbol`, concentrated on a few tasks: GET_CLOSET_VOWEL 20, MIN_SUBARRAY_SUM 18, MATCH_PARENS 13, FIND_ZERO 11, SORTED_LIST_SUM 9, DECODE_CYCLIC 8.
 - **Cause 1, renamed methods:** the description uses another name for the function than the Java method the tests call, and the model "corrects" the method name to match, so the tests no longer find it. Examples: `get_closest_vowel` vs `get_closet_vowel`; `minSubArraySum` vs `min_subarray_sum`; `digitSum` vs `digit_sum`; `words_string` vs `words_strings`; `sort_array` vs `sort_array_binary`; `triangle_area` vs `triangle_area_2`; `list_sort` vs `sorted_list_sum`; `specialFilter`, `Strongest_Extension`, `solve` vs the Java names.
   - **Most of these come from the benchmark's own Java-file comments** (e.g. GET_CLOSET_VOWEL, MIN_SUBARRAY_SUM, WORDS_STRINGS), not only from the HumanEval fallback descriptions (P1, #40). An automatic scan flagged 22 tasks; about 12 are real name mismatches (the rest are words like `len(`, `range(` in examples).
@@ -798,7 +798,8 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Renamed back, **13 of the 48 pass**: MIN_SUBARRAY_SUM 8/18, SORTED_LIST_SUM 5/6, GET_CLOSET_VOWEL 0/20, WORDS_STRINGS 0/4. The other 35 fail anyway (20 runtime errors, 14 wrong answers, 1 compile error), i.e. the model renamed *instead of* fixing the bug.
   - **Effect on the score:** pass@1 64.79% → 65.18% (**+0.39 pp**); pass@10 81.94% → 82.55% (+0.61 pp), if every rename were forgiven.
   - **Interpretation:** even in the worst case, where a fine-tuned model never renames and M0 always does, the descriptions shift the comparison by at most ~0.4 pp of pass@1, far below the ±6 pp sampling interval of a 163-task benchmark. The "different method" cases are a model error regardless of the descriptions.
-  - **Recommendation:** option (a), keep the benchmark's descriptions unchanged; report this diagnostic in the threats-to-validity chapter. Awaiting the user's decision.
+  - **Recommendation:** option (a), keep the benchmark's descriptions unchanged; report this diagnostic in the threats-to-validity chapter.
+- ✅ **User decision (2026-10-22): option (a): keep the HumanEval-Java descriptions unchanged.** No change to the data or prompts. Renamed methods and "different method returned" count as failures for every model. The thesis reports the diagnostic (48 renames in 4 tasks; forgiving them would change M0's pass@1 by +0.39 pp) as a threat to validity.
 
 
 ### 54. Why a widely used benchmark can contain defects ✅
@@ -820,7 +821,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 
 - **Two readings of the requirement:** (strict) the dataset itself must come from a journal paper, which only CodeXGLUE/Tufano meets; (practical) the dataset must be established, peer-reviewed and used in journal research, which our design meets via the RepairLLaMA TSE 2025 precedent (Megadiff training + HumanEval-Java evaluation, same preprocessing). In SE, ICSE is a CORE A* venue.
 - **Suggested to the user:** ask the professor which reading applies, presenting the table and the TSE precedent; offered to draft a factual email for the user to send. Fallbacks if strict: (a) keep Megadiff + HumanEval-Java citing TSE 2025, HumanEvalFix-Java as secondary; (b) return to Tufano's journal dataset (reopens #32–#36). No change until the professor answers.
-- **Still open from #53:** keep the HumanEval-Java descriptions unchanged (option a) — awaiting the user's confirmation.
+- #53 decided: descriptions unchanged (option a).
 
 ### 56. Email to the professor drafted (dataset requirement) ✅ draft
 - 2026-10-22: drafted at the user's request; the user sends it. Saved outside the repo (`thesis/emails/2026-10-22_professor_dataset_question.md`).
@@ -884,4 +885,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 7. ~~Other HumanEvalPack languages~~ → added (#22), then dropped from the study: evaluation is Java only (#37, #39).
 6. ~~Second language~~ → HumanEvalFix added (#20). RQ wording updated in the plan (#44); the thesis text follows when written.
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
-9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). Still open: GPU dry run (#39 item 4, waits for AWS, #41).
+9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
+10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
+11. GPU platform for the official runs: AWS A10G (if the appeal is approved) vs Modal A10 (#49). Check on 2026-10-22, 10:13.
+12. Professor's "journal-published dataset" requirement: email sent (#55, #56); awaiting reply. Code4Bench as an optional third test set (#57, #58) depends on it.
