@@ -1,8 +1,12 @@
-"""Test execution for HumanEvalFix (Pass@1) in Python, Java, C++, Go, Rust and JavaScript.
+"""Test execution and pass@k for HumanEvalFix (Python, Java, C++, Go, Rust, JavaScript)
+and HumanEval-Java.
 
 Each candidate fix is combined with the benchmark's hidden unit tests, built,
 and run with a timeout. Outcome per sample:
     passed | failed (assertion / wrong output) | compile_error | runtime_error | timeout
+
+pass@k uses the unbiased estimator of Chen et al. (2021) over the n samples per
+task; pass@1 and pass@10 come from the same n = 20 samples (RESEARCH_LOG #37/#39).
 
 Per-language harness:
     python  python -I prog.py                       (isolated interpreter)
@@ -12,29 +16,37 @@ Per-language harness:
     rust    one shared cargo project (rand, regex, md5); cargo test --no-run, then cargo test
     js      node, with console.assert patched to THROW (Node's console.assert only
             prints "Assertion failed" and exits 0, which would score failing code as passing)
+    HumanEval-Java  the predicted method replaces lines begin..end of the buggy class;
+            javac + JUnitCore with the jars in clm's lib/. Needs JDK 8 (Nashorn,
+            javax.xml.bind): set HEJ_JAVA_HOME, e.g. /usr/lib/jvm/java-8-openjdk-amd64
 
 SAFETY: this executes model-generated code. Run it on a disposable machine or
 container (e.g. the GPU VM), never on a personal laptop with real data, except
 for the canonical/buggy sanity checks shipped with the benchmark.
 
 Toolchain setup on the GPU VM (Ubuntu):
-    apt install -y default-jdk g++ libboost-dev libssl-dev golang nodejs cargo
+    apt install -y default-jdk openjdk-8-jdk g++ libboost-dev libssl-dev golang nodejs cargo
 """
 
 import argparse
 import json
+import math
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
-from collections import Counter
+from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 TIMEOUT_S = 10
 COMPILE_TIMEOUT_S = 120
 CACHE_DIR = Path(os.environ.get("HEF_CACHE", Path.home() / ".cache" / "peft-code-eval"))
+HEJ_LIB = Path(os.environ.get("HEJ_LIB", "data/clm/humaneval-java/lib"))
+HEJ_JAVA_HOME = os.environ.get("HEJ_JAVA_HOME")
+HEJ_TIMEOUT_S = 120  # whole JUnit run; an infinite loop costs 3 s per test case
 
 JAVA_IMPORTS = "import java.util.*;\nimport java.lang.*;\n"
 JS_STRICT_ASSERT = (
@@ -63,7 +75,10 @@ DEFECTIVE_TASKS = {
     "CPP/23": "buggy code passes the hidden tests (tests do not detect the bug)",
     "Go/95": "flaky: reference fix depends on Go's random map iteration order (failed 1 of 5 runs)",
     "Rust/32": "flaky: unseeded random test; reference Newton solver sometimes never converges (timeout)",
+    "HumanEval-Java/ISCUBE": "buggy file is identical to the correct file (no bug)",
 }
+# Run after the parallel pool, one at a time: Nashorn start-up + JUnit's 3 s timeout fail under load (#38)
+SERIAL_TASKS = {"HumanEval-Java/DO_ALGEBRA"}
 _FENCE = re.compile(r"```[\w+#-]*[ \t]*\n(.*?)```", re.DOTALL)
 
 
@@ -260,53 +275,118 @@ def run_js(code, record, timeout):
         return _outcome(_run(["node", "prog.js"], tmp, timeout), ["AssertionError"])
 
 
+# ----------------------------------------------------------------------------- HumanEval-Java
+
+def _hej_bin(tool):
+    return str(Path(HEJ_JAVA_HOME, "bin", tool)) if HEJ_JAVA_HOME else tool
+
+
+def run_humaneval_java(code, record, timeout):
+    """The prediction is a method: it replaces lines begin..end of the buggy class.
+    A prediction that contains the whole class replaces the file instead."""
+    name = record["name"]
+    if re.search(rf"\bclass {name}\b", code):
+        code = re.sub(r"^package [\w.]+;", "", code, count=1, flags=re.M)
+        source = "package humaneval.buggy;\n" + code
+    else:
+        lines = record["buggy_class"].splitlines(keepends=True)
+        source = "".join(lines[:record["begin"] - 1]) + code + "\n" + "".join(lines[record["end"]:])
+    cp = ":".join(str(j.resolve()) for j in sorted(HEJ_LIB.glob("*.jar")))
+    if not cp:
+        raise RuntimeError(f"no JUnit jars in {HEJ_LIB} (set HEJ_LIB)")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp, "humaneval", "buggy")
+        src.mkdir(parents=True)
+        Path(tmp, "out").mkdir()  # JDK 8 javac -d does not create it
+        Path(src, f"{name}.java").write_text(source)
+        Path(tmp, "humaneval", f"TEST_{name}.java").write_text(record["test"])
+        c = _run([_hej_bin("javac"), "-nowarn", "-cp", cp, "-d", "out",
+                  f"humaneval/buggy/{name}.java", f"humaneval/TEST_{name}.java"], tmp, COMPILE_TIMEOUT_S)
+        if c is None or c.returncode != 0:
+            return "compile_error", (c.stderr[-500:] if c else "javac timeout")
+        r = _run([_hej_bin("java"), "-Xmx512m", "-cp", f"out:{cp}", "org.junit.runner.JUnitCore",
+                  f"humaneval.TEST_{name}"], tmp, HEJ_TIMEOUT_S)  # JUnit enforces 3 s per test itself
+        return _outcome(r, ["AssertionError", "ComparisonFailure", "TestTimedOutException"])
+
+
 RUNNERS = {"python": run_python, "java": run_java, "cpp": run_cpp, "go": run_go, "rust": run_rust, "js": run_js}
 
 
 def execute(code, record, timeout=TIMEOUT_S):
+    if record.get("benchmark") == "humaneval_java":
+        return run_humaneval_java(code, record, timeout)
     return RUNNERS[record["language"]](code, record, timeout)
 
 
-def pass_at_1(records, codes, timeout=TIMEOUT_S):
-    """Greedy Pass@1 plus an outcome breakdown and per-sample results."""
-    per_sample = []
-    for rec, code in zip(records, codes):
-        status, detail = execute(code, rec, timeout)
-        per_sample.append({"id": rec["id"], "language": rec["language"], "bug_type": rec["bug_type"],
-                           "status": status, "detail": detail})
+def pass_at_k(n, c, k):
+    """Unbiased pass@k for one task with n samples, c of them correct (Chen et al., 2021)."""
+    if n < k:
+        return None
+    if n - c < k:
+        return 1.0
+    return 1.0 - math.comb(n - c, k) / math.comb(n, k)
+
+
+def _group(record):
+    return record.get("benchmark", "humanevalfix") + "_" + record["language"]
+
+
+def score(records, codes, timeout=TIMEOUT_S, ks=(1, 10), workers=1):
+    """pass@k per benchmark (all tasks and clean subset) plus per-sample outcomes.
+
+    codes[i] is the list of n candidate programs for records[i] (n = 1 for greedy or sanity runs).
+    """
+    jobs = [(i, j) for i, cands in enumerate(codes) for j in range(len(cands))]
+    if any(r["language"] == "rust" for r in records):
+        workers = 1  # the shared cargo project is not thread-safe
+    serial = [x for x in jobs if records[x[0]]["id"] in SERIAL_TASKS]
+    parallel = [x for x in jobs if records[x[0]]["id"] not in SERIAL_TASKS]
+    run = lambda x: execute(codes[x[0]][x[1]], records[x[0]], timeout)
+    with ThreadPoolExecutor(workers) as ex:
+        results = dict(zip(parallel, ex.map(run, parallel)))
+    results.update({x: run(x) for x in serial})
+
+    per_sample = [{"id": records[i]["id"], "benchmark": _group(records[i]), "sample": j,
+                   "bug_type": records[i].get("bug_type"), "status": results[(i, j)][0],
+                   "detail": results[(i, j)][1]} for i, j in jobs]
+    passed = defaultdict(int)
+    for s in per_sample:
+        passed[s["id"]] += s["status"] == "passed"
     summary = {}
-    for language in sorted({r["language"] for r in records}):
-        rows = [s for s in per_sample if s["language"] == language]
-        counts = Counter(s["status"] for s in rows)
-        clean = [s for s in rows if s["id"] not in DEFECTIVE_TASKS]
-        summary[language] = {
-            "n": len(rows),
-            "pass_at_1_pct": round(100 * counts["passed"] / len(rows), 2),
-            "n_clean": len(clean),
-            "pass_at_1_clean_pct": round(100 * sum(s["status"] == "passed" for s in clean) / len(clean), 2),
-            "outcomes": dict(counts),
-        }
+    for group in sorted({_group(r) for r in records}):
+        tasks = [(r, len(c)) for r, c in zip(records, codes) if _group(r) == group]
+        counts = Counter(s["status"] for s in per_sample if s["benchmark"] == group)
+        entry = {"n_tasks": len(tasks), "n_samples_per_task": sorted({n for _, n in tasks}),
+                 "n_clean": sum(r["id"] not in DEFECTIVE_TASKS for r, _ in tasks), "outcomes": dict(counts)}
+        for k in ks:
+            for label, subset in (("", tasks), ("_clean", [t for t in tasks if t[0]["id"] not in DEFECTIVE_TASKS])):
+                vals = [pass_at_k(n, passed[r["id"]], k) for r, n in subset]
+                if subset and None not in vals:
+                    entry[f"pass_at_{k}{label}_pct"] = round(100 * sum(vals) / len(vals), 2)
+        summary[group] = entry
     return summary, per_sample
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("data", nargs="+", help="humanevalfix_<lang>.jsonl file(s); add 'prediction' fields to score a model")
+    parser.add_argument("data", nargs="+",
+                        help="benchmark JSONL file(s); prediction files from evaluator.py carry a 'predictions' list")
     parser.add_argument("--sanity", choices=["canonical", "buggy"],
                         help="run the reference fixes (expect 100%%) or the buggy code (expect ~0%%) instead of predictions")
     parser.add_argument("--timeout", type=int, default=TIMEOUT_S)
+    parser.add_argument("--workers", type=int, default=os.cpu_count() or 1)
     parser.add_argument("--per_sample_out")
     args = parser.parse_args()
 
     records = [json.loads(l) for p in args.data for l in open(p) if l.strip()]
     if args.sanity == "canonical":
-        codes = [r["target"] for r in records]
+        codes = [[r["target"]] for r in records]
     elif args.sanity == "buggy":
-        codes = [r["buggy"] for r in records]
+        codes = [[r["buggy"]] for r in records]
     else:
-        codes = [extract_code(r["prediction"]) for r in records]
+        codes = [[extract_code(p) for p in r["predictions"]] for r in records]
 
-    summary, per_sample = pass_at_1(records, codes, args.timeout)
+    summary, per_sample = score(records, codes, args.timeout, workers=args.workers)
     print(json.dumps(summary, indent=2))
     if args.per_sample_out:
         with open(args.per_sample_out, "w") as f:

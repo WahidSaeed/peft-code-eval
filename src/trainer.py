@@ -47,7 +47,7 @@ FIXED = {
     "per_device_train_batch_size": 4,
     "gradient_accumulation_steps": 4,  # effective batch 16
     "num_train_epochs": 3,
-    "max_length": 512,
+    "max_length": 768,  # Megadiff pairs above 768 tokens are dropped when the splits are built (#39)
     "lora_dropout": 0.05,
     "lr_scheduler_type": "cosine",
     "warmup_ratio": 0.03,
@@ -134,7 +134,7 @@ def parse_args(argv=None):
     p.add_argument("--run_name", help="e.g. M1 (default: output_dir name)")
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--data_dir", default="data")
-    p.add_argument("--subset", default="medium")
+    p.add_argument("--subset", default="megadiff", help="data file prefix: <subset>_{train,validation}.jsonl")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--max_steps", type=int, default=-1, help="optimizer steps; > 0 overrides epochs (dry runs)")
     p.add_argument("--train_limit", type=int, help="use only the first N training examples (debugging)")

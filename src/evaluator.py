@@ -1,20 +1,26 @@
-"""Greedy inference for one model (M0 base or an M1–M9 adapter) on one benchmark.
+"""Inference for one model (M0 base or an M1–M9 adapter) on one benchmark.
 
     # M0: untuned base model (16-bit)
-    python src/evaluator.py --bits 16 --run_name M0 --benchmark codexglue
+    python src/evaluator.py --bits 16 --run_name M0 --benchmark megadiff --score
     # M1: 4-bit base + its trained adapter
-    python src/evaluator.py --bits 4 --adapter results/runs/M1/adapter --run_name M1 --benchmark humanevalfix
+    python src/evaluator.py --bits 4 --adapter results/runs/M1/adapter --run_name M1 --benchmark humaneval_java
+
+Decoding (RESEARCH_LOG #37/#39):
+  megadiff        greedy, 1 sample: Exact Match / CodeBLEU / syntax on the held-out split
+  humanevalfix,   sampled, n = 20, temperature 0.2, top-p 0.95 (OctoPack protocol):
+  humaneval_java  pass@1 and pass@10 from the same samples, scored by execution.py
 
 Two measurement phases, both on the same loaded model:
   1. Batched generation over the whole test set → predictions JSONL, generation
      throughput, peak inference VRAM and energy (RQ2/RQ3).
-  2. Latency probe at batch size 1 on the first --latency_samples prompts →
-     Time-to-First-Token and decode tokens/s, as a single developer would see (RQ3).
+  2. Latency probe at batch size 1, always GREEDY, on the first --latency_samples
+     prompts → Time-to-First-Token and decode tokens/s, as a single developer would see (RQ3).
 
 The adapter is applied unmerged on top of the quantized base (how QLoRA models are
-served). Predictions are written with every field metrics_se.py / execution.py need.
-CodeXGLUE predictions can be scored inline (--score). HumanEvalFix predictions run
-model-generated code, so score them separately with execution.py on a disposable machine.
+served). Each output row carries a `predictions` list (n entries) plus every field
+metrics_se.py / execution.py need. Megadiff predictions can be scored inline (--score).
+Test-based predictions run model-generated code, so score them separately with
+execution.py on a disposable machine.
 """
 
 import argparse
@@ -34,14 +40,17 @@ from data_loader import DEFAULT_MODEL, HEF_LANGUAGES, chat_prompt  # noqa: E402
 from profiler import GPUProfiler, append_csv, measure_generation  # noqa: E402
 from trainer import quantization_config  # noqa: E402
 
-# Longest reference fix + margin (measured with the DeepSeek tokenizer, RESEARCH_LOG #26):
-# CodeXGLUE max 194 tokens, HumanEvalFix max 935 (Rust)
-MAX_NEW_TOKENS = {"codexglue": 256, "humanevalfix": 1024}
+# Longest reference fix + margin (DeepSeek tokenizer, RESEARCH_LOG #39):
+# Megadiff test max 375 tokens, HumanEval-Java max 383, HumanEvalFix-Java max 506 (whole class)
+MAX_NEW_TOKENS = {"megadiff": 512, "humaneval_java": 512, "humanevalfix": 768}
+N_SAMPLES = {"megadiff": 1, "humaneval_java": 20, "humanevalfix": 20}
 
 
-def load_records(benchmark, data_dir, subset, languages, limit=None):
-    if benchmark == "codexglue":
-        paths = [Path(data_dir) / f"{subset}_test.jsonl"]
+def load_records(benchmark, data_dir, languages, limit=None):
+    if benchmark == "megadiff":
+        paths = [Path(data_dir) / "megadiff_test.jsonl"]
+    elif benchmark == "humaneval_java":
+        paths = [Path(data_dir) / "humaneval_java.jsonl"]
     else:
         paths = [Path(data_dir) / f"humanevalfix_{lang}.jsonl" for lang in languages]
     records = []
@@ -66,14 +75,18 @@ def load_model(model_name, bits, adapter=None):
     return model
 
 
-def _gen_kwargs(tokenizer, max_new_tokens):
-    return {
-        "do_sample": False,  # greedy
+def _gen_kwargs(tokenizer, max_new_tokens, n_samples=1, temperature=0.2, top_p=0.95):
+    """Greedy for n_samples == 1, otherwise n_samples sampled sequences per prompt."""
+    kwargs = {
+        "do_sample": False,
         "num_beams": 1,
         "max_new_tokens": max_new_tokens,
         "eos_token_id": tokenizer.eos_token_id,
         "pad_token_id": tokenizer.pad_token_id,
     }
+    if n_samples > 1:
+        kwargs.update(do_sample=True, temperature=temperature, top_p=top_p, num_return_sequences=n_samples)
+    return kwargs
 
 
 def _n_generated(seq, eos_id, pad_id):
@@ -89,23 +102,30 @@ def _n_generated(seq, eos_id, pad_id):
 
 
 @torch.no_grad()
-def generate_all(model, tokenizer, prompts, batch_size, max_new_tokens, prof=None):
-    """Batched greedy generation; prompts are length-sorted to cut padding, output keeps input order."""
+def generate_all(model, tokenizer, prompts, batch_size, max_new_tokens, n_samples=1, temperature=0.2, top_p=0.95,
+                 prof=None):
+    """Batched generation; prompts are length-sorted to cut padding, output keeps input order.
+
+    batch_size counts sequences: with n_samples > 1, batch_size // n_samples prompts (at least 1)
+    go into each generate() call. Returns per prompt a list of n_samples outputs and token counts.
+    """
     order = sorted(range(len(prompts)), key=lambda i: len(prompts[i]))
-    outputs, n_tokens = [None] * len(prompts), [0] * len(prompts)
-    kwargs = _gen_kwargs(tokenizer, max_new_tokens)
+    outputs, n_tokens = [None] * len(prompts), [None] * len(prompts)
+    kwargs = _gen_kwargs(tokenizer, max_new_tokens, n_samples, temperature, top_p)
+    per_call = max(1, batch_size // n_samples)
     device = model.device
-    for start in range(0, len(order), batch_size):
-        idx = order[start:start + batch_size]
+    for start in range(0, len(order), per_call):
+        idx = order[start:start + per_call]
         enc = tokenizer([prompts[i] for i in idx], return_tensors="pt", padding=True, add_special_tokens=False).to(device)
         out = model.generate(**enc, **kwargs)
-        new = out[:, enc["input_ids"].shape[1]:]
-        for row, i in enumerate(idx):
-            outputs[i] = tokenizer.decode(new[row], skip_special_tokens=True)
-            n_tokens[i] = _n_generated(new[row].tolist(), tokenizer.eos_token_id, tokenizer.pad_token_id)
+        new = out[:, enc["input_ids"].shape[1]:]  # rows: prompt 0 × n_samples, prompt 1 × n_samples, ...
+        for k, i in enumerate(idx):
+            rows = new[k * n_samples:(k + 1) * n_samples]
+            outputs[i] = [tokenizer.decode(r, skip_special_tokens=True) for r in rows]
+            n_tokens[i] = [_n_generated(r.tolist(), tokenizer.eos_token_id, tokenizer.pad_token_id) for r in rows]
         if prof is not None:
-            prof.add(samples=len(idx), tokens=sum(n_tokens[i] for i in idx))
-        print(f"  generated {min(start + batch_size, len(order))}/{len(order)}", flush=True)
+            prof.add(samples=len(idx) * n_samples, tokens=sum(sum(n_tokens[i]) for i in idx))
+        print(f"  generated {min(start + per_call, len(order))}/{len(order)} prompts", flush=True)
     return outputs, n_tokens
 
 
@@ -143,21 +163,24 @@ def parse_args(argv=None):
     p.add_argument("--bits", type=int, choices=[4, 8, 16], required=True, help="precision of the base model")
     p.add_argument("--adapter", help="trained LoRA adapter dir (omit for M0)")
     p.add_argument("--run_name", required=True, help="M0 … M9")
-    p.add_argument("--benchmark", choices=["codexglue", "humanevalfix"], required=True)
-    p.add_argument("--languages", nargs="+", default=list(HEF_LANGUAGES), help="HumanEvalFix languages")
+    p.add_argument("--benchmark", choices=list(MAX_NEW_TOKENS), required=True)
+    p.add_argument("--languages", nargs="+", default=["java"], choices=HEF_LANGUAGES, help="HumanEvalFix languages")
     p.add_argument("--model", default=DEFAULT_MODEL)
     p.add_argument("--data_dir", default="data")
-    p.add_argument("--subset", default="medium")
     p.add_argument("--output_dir", default="results/predictions")
     p.add_argument("--log_csv", default="results/eval_log.csv")
-    p.add_argument("--batch_size", type=int, default=8)
-    p.add_argument("--max_new_tokens", type=int, help="default: 256 (CodeXGLUE) / 1024 (HumanEvalFix)")
+    p.add_argument("--batch_size", type=int, default=20, help="sequences per generate() call")
+    p.add_argument("--max_new_tokens", type=int, help=f"default per benchmark: {MAX_NEW_TOKENS}")
+    p.add_argument("--n_samples", type=int, help=f"samples per prompt; 1 = greedy. Default per benchmark: {N_SAMPLES}")
+    p.add_argument("--temperature", type=float, default=0.2)
+    p.add_argument("--top_p", type=float, default=0.95)
     p.add_argument("--latency_samples", type=int, default=50, help="batch-size-1 latency probe size (0 = skip)")
     p.add_argument("--limit", type=int, help="first N records per file (debugging)")
-    p.add_argument("--score", action="store_true", help="score CodeXGLUE inline (EM, CodeBLEU, syntax)")
+    p.add_argument("--score", action="store_true", help="score Megadiff inline (EM, CodeBLEU, syntax; first sample)")
     p.add_argument("--seed", type=int, default=42)
     args = p.parse_args(argv)
     args.max_new_tokens = args.max_new_tokens or MAX_NEW_TOKENS[args.benchmark]
+    args.n_samples = args.n_samples or N_SAMPLES[args.benchmark]
     return args
 
 
@@ -169,7 +192,7 @@ def main(argv=None):
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "left"  # decoder-only batched generation
 
-    records = load_records(args.benchmark, args.data_dir, args.subset, args.languages, args.limit)
+    records = load_records(args.benchmark, args.data_dir, args.languages, args.limit)
     prompts = [chat_prompt(tokenizer, r["prompt"]) for r in records]
     print(f"{args.run_name}: {len(records)} prompts from {args.benchmark}")
 
@@ -181,21 +204,23 @@ def main(argv=None):
     static_vram = round(torch.cuda.memory_allocated() / 1024**3, 3) if torch.cuda.is_available() else None
     _warmup(model, tokenizer, prompts[0])
 
+    set_seed(args.seed)  # sampling starts from the same RNG state for every model
     with GPUProfiler() as prof:
-        predictions, n_tokens = generate_all(model, tokenizer, prompts, args.batch_size, args.max_new_tokens, prof)
+        predictions, n_tokens = generate_all(model, tokenizer, prompts, args.batch_size, args.max_new_tokens,
+                                             args.n_samples, args.temperature, args.top_p, prof)
     latency = latency_probe(model, tokenizer, prompts[:args.latency_samples], args.max_new_tokens) \
         if args.latency_samples > 0 else {}
 
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    suffix = "codexglue" if args.benchmark == "codexglue" else "humanevalfix_" + "-".join(args.languages)
+    suffix = "humanevalfix_" + "-".join(args.languages) if args.benchmark == "humanevalfix" else args.benchmark
     pred_path = out_dir / f"{args.run_name}_{suffix}.jsonl"
     with pred_path.open("w") as f:
-        for r, pred, n in zip(records, predictions, n_tokens):
-            f.write(json.dumps({**r, "prediction": pred, "generated_tokens": n, "run_name": args.run_name}) + "\n")
+        for r, preds, n in zip(records, predictions, n_tokens):
+            f.write(json.dumps({**r, "predictions": preds, "generated_tokens": n, "run_name": args.run_name}) + "\n")
 
     p = prof.results
-    hit_limit = sum(n >= args.max_new_tokens for n in n_tokens)
+    hit_limit = sum(n >= args.max_new_tokens for ns in n_tokens for n in ns)
     row = {
         "run_name": args.run_name,
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -204,6 +229,9 @@ def main(argv=None):
         "bits": args.bits,
         "adapter": args.adapter or "",
         "batch_size": args.batch_size,
+        "n_samples": args.n_samples,
+        "temperature": args.temperature if args.n_samples > 1 else None,
+        "top_p": args.top_p if args.n_samples > 1 else None,
         "max_new_tokens": args.max_new_tokens,
         "hit_max_new_tokens": hit_limit,
         "model_load_s": round(load_s, 1),
@@ -219,9 +247,9 @@ def main(argv=None):
         "gpu_name": p.get("gpu_name"),
         "predictions": str(pred_path),
     }
-    if args.score and args.benchmark == "codexglue":
+    if args.score and args.benchmark == "megadiff":
         from metrics_se import evaluate, extract_code
-        summary, _ = evaluate([extract_code(x) for x in predictions], [r["target"] for r in records])
+        summary, _ = evaluate([extract_code(x[0]) for x in predictions], [r["target"] for r in records])
         row.update({k: v for k, v in summary.items() if k != "n"})
 
     append_csv(args.log_csv, row)

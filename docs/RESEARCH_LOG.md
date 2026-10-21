@@ -14,18 +14,19 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 |---|---|---|
 | Repo scaffold (`peft-code-eval/`) | ✅ | Folder layout per plan §7 |
 | `requirements.txt` | ✅ | tree-sitter / codebleu versions pinned (see 2026-10-20 #7) |
-| `src/data_loader.py` | ✅ | Tested on CodeXGLUE Medium |
+| `src/data_loader.py` | ✅ | Megadiff (≤ 768, path split) + HumanEvalFix-Java + HumanEval-Java (#39) |
 | `src/profiler.py` | ✅ (untested on GPU) | Compiles; needs GPU for a real test |
 | `src/metrics_se.py` | ✅ | Sanity-checked on ground truth |
 | `src/trainer.py` | ✅ (CPU smoke test) | GPU paths validated by the dry run (#25) |
-| `src/evaluator.py` | ✅ (CPU smoke test) | Batched predictions + batch-1 latency probe (#26) |
+| `src/evaluator.py` | ✅ (CPU smoke test) | Greedy (Megadiff) / n = 20 sampling (test-based) + greedy batch-1 latency probe (#26, #39) |
 | `scripts/run_matrix.sh`, `scripts/evaluate_all.sh` | ✅ | Tested in a bash 5 container (#26) |
-| `src/execution.py` (HumanEvalFix Pass@1) | ✅ | 6 languages; clean subset canonical 100 % / buggy 0 % (#22) |
+| `src/execution.py` (pass@1, pass@10) | ✅ | HumanEvalFix-Java + HumanEval-Java: clean sets canonical 100 % / buggy 0 % (#39); other HEF languages validated in #22 |
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
 | Phase 0: reproduce Tier-A papers | ❓ | Artifacts checked (#28): Li ✅ full, Huang ✅ code+data, Wei ❌ none; scope decision pending |
-| Pass@k in RQ1 (CodeXGLUE has no tests) | ✅ | Resolved: Pass@1 on HumanEvalFix (#20) |
+| Pass@k in RQ1 | ✅ | pass@1 primary + pass@10 secondary, n = 20, T = 0.2 (#37, #39) |
+| Training data | ✅ | Megadiff replaces CodeXGLUE (#34–#39) |
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
 | Novelty check + positioning table | ✅ | No prior bit-width × rank study for APR found (#29) |
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
@@ -557,13 +558,50 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Overall:** roughly 110–150 GPU-h (~$135–180), within the $700 credit.
 - ❓ **For the user:** (1) switch to Megadiff, yes or no; (2) token cap ≤ 512 vs ≤ 768; (3) the split rule.
 
+### 39. Decision: switch to Megadiff (≤ 768 tokens, split by file path); pipeline rebuilt ✅
+- **User decisions (2026-10-21), on the #38 results:**
+  1. **Switch the training data from CodeXGLUE to Megadiff** ✅
+  2. **Token cap ≤ 768** (keeps 10k/1k/1k; ~1.35× training tokens vs ≤ 512) ✅
+  3. **Split by file path** ✅
+  - Together with #37: evaluation is **Java only** (HumanEvalFix-Java + HumanEval-Java); **pass@1 primary, pass@10 secondary**, both from n = 20 samples at T = 0.2.
+- **Data (`src/data_loader.py`, rebuilt):**
+  - Cleaning: drop identical / whitespace-only / comment-only changes (2,101), duplicate pairs (5,458), pairs sharing a 20-token sequence with any HumanEvalFix-Java or HumanEval-Java method, buggy or fixed (**84**), and pairs over 768 tokens (44,644). Methods are dedented before use.
+  - Pool: **20,106** pairs in 18,780 file paths.
+  - Split: paths shuffled (seed 42), then whole path groups fill test, validation, then train; a group that overshoots a target is trimmed by random sampling, and the trimmed rows are discarded (never moved to another split). The loader asserts that no path occurs in two splits.
+
+| Split | Pairs | Mean tokens | Median | p95 | Max |
+|---|---|---|---|---|---|
+| train | 10,000 | 485 | 492 | 740 | 768 |
+| validation | 1,000 | 500 | 520 | 741 | 768 |
+| test | 1,000 | 484 | 492 | 740 | 768 |
+
+  - ⚠️ **What the path split does and doesn't prevent:** most paths have one change (20,106 pairs / 18,780 paths). It keeps repeated edits of one file and forks of the same file in one split. It can't keep a whole *project* in one split: Megadiff has no repository field. In-task EM may still be slightly optimistic; the test-based metrics are unaffected.
+  - Prompt: `The following Java method contains a bug. Return only the corrected Java method, with no explanation.` + the buggy method. (The CodeXGLUE wording about abstracted identifiers is gone.)
+- **HumanEval-Java (`load_humaneval_java`):** the prompt is the buggy method alone, in the Megadiff training format; the harness splices the predicted method into lines begin..end of the buggy class (a prediction containing the whole class replaces the file). The line ranges in `humaneval-java-sf.json` match the files except for tabs in MAKE_A_PILE and WORDS_STRINGS (checked with tabs expanded).
+- **Harness (`src/execution.py`):** HumanEval-Java runner (JDK 8 via `HEJ_JAVA_HOME`, JUnit jars via `HEJ_LIB`); unbiased **pass@k** (Chen et al., 2021); thread-pool scoring (`--workers`); DO_ALGEBRA runs serially after the pool; ISCUBE is in `DEFECTIVE_TASKS`.
+  - **Sanity (macOS, JDK 8 for HumanEval-Java):** references pass **164/164** (HumanEvalFix-Java) and **163/163** (HumanEval-Java, spliced methods); buggy code passes **0/164** and **1/163** (= ISCUBE) → **clean sets 100% / 0%**.
+  - pass@k unit checks: n = 20, c = 1 → pass@1 = 0.05, pass@10 = 0.5; c = 0 → 0; c = 20 → 1.
+- **Evaluator (`src/evaluator.py`):** benchmarks `megadiff` (greedy, 1 sample, scored inline), `humanevalfix` (Java by default) and `humaneval_java` (20 samples, T = 0.2, top-p 0.95). `--batch_size` counts sequences (default 20 = one prompt × 20 samples). The RNG is re-seeded before generation, so every model sees the same sampling seed. The latency probe stays **greedy, batch size 1**. Output rows carry a `predictions` list.
+  - max_new_tokens: 512 (Megadiff; longest test target 375 tokens), 512 (HumanEval-Java; 383), 768 (HumanEvalFix-Java whole class; 506).
+- **Metrics (`src/metrics_se.py`):** the CodeXGLUE de-tokenisation rules (#9) are removed; real Java needs none and they could alter real code. Ground-truth syntax validity on the Megadiff test split: **99.8%** (2/1,000 fail to parse with tree-sitter-java 0.21). **Naive copy: 0.876 CodeBLEU, 0% EM.**
+- **Trainer:** default data prefix `megadiff`, `max_length` 768 (0 truncated by construction).
+- **Tests:** CPU smoke tests with the tiny 2-layer model: trainer on Megadiff (2 steps, initial loss 10.40 ≈ ln 32k); evaluator on Megadiff (greedy, `--score`) and HumanEval-Java (4 samples per prompt, 2 prompts per call) → `execution.py` scores it (0%, as expected for a random model). `scripts/evaluate_all.sh` updated (Megadiff + both test-based benchmarks, refuses to run without `HEJ_JAVA_HOME`); `bash -n` passes.
+- **Superseded:** the CodeXGLUE-specific findings (#5–#10: split sizes, length 512, de-tokenisation, naive copy 0.887) stay in this log as history; they no longer describe the pipeline.
+- ❓ **Still to discuss with the user before the GPU runs** (implemented with a default, not decided):
+  1. **HumanEval-Java prompt has no specification.** Only the buggy method is shown (training format, as in Jiang et al.), not the problem description above the class. Some bugs may be unidentifiable without it. Alternative: prepend the description as a comment.
+  2. **HumanEvalFix-Java keeps its OctoPack-style prompt** (whole class + example tests), which differs from the training format (method only). Pro: comparable with published numbers (StarCoder2 report: 52.2 for DeepSeek-Coder-6.7B-Instruct). Con: a format shift between training and test.
+  3. **Megadiff in-task EM uses greedy decoding** (1 sample). Beam search (CodeXGLUE convention) is not used.
+  4. **Batch size / memory at max_length 768** and the sampling batch: to be confirmed by the GPU dry run.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
-1. ~~Pass@k~~ → resolved by HumanEvalFix Pass@1 (#20).
+1. ~~Pass@k~~ → pass@1 primary + pass@10 secondary from n = 20 samples (#37, #39).
 2. ~~Multiple seeds~~ → 3 seeds (42/43/44) for M2, M5, M8 (#27).
 3. ~~M0~~ → zero-shot (#27).
 4. Phase 0 reproduction: artifacts checked (#28). Li ✅, Huang ✅ (Drive), Wei ❌. Pick the scope from #28's proposal.
 5. GPU platform: **AWS A10G** if the appeal is approved; **RunPod RTX 4090 (backlog)** only if denied (#23).
-7. ~~Other HumanEvalPack languages~~ → all six added (#22).
-6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis.
+7. ~~Other HumanEvalPack languages~~ → added (#22), then dropped from the study: evaluation is Java only (#37, #39).
+6. ~~Second language~~ → HumanEvalFix added (#20). Still to do: update the RQ1 wording in the plan and thesis (now Megadiff + Java-only, pass@1/pass@10).
+8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
+9. Prompt formats and Megadiff decoding: the four items at the end of #39.

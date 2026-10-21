@@ -1,8 +1,8 @@
 """Software-engineering correctness metrics for RQ1.
 
 - Syntax Validity Rate: tree-sitter-java parse without ERROR/MISSING nodes.
-  CodeXGLUE refinement samples are single methods, so each one is wrapped in a
-  dummy class before parsing (a bare method is not a valid compilation unit).
+  Megadiff samples are single methods, so each one is wrapped in a dummy class
+  before parsing (a bare method is not a valid compilation unit).
 - Exact Match: whitespace-normalised string equality with the developer fix.
 - CodeBLEU (Ren et al., 2020): n-gram, weighted n-gram, AST and data-flow match.
 """
@@ -23,27 +23,6 @@ WRAPPER_OPEN = "class __Wrapper__ {\n"
 WRAPPER_CLOSE = "\n}"
 _FENCE = re.compile(r"```[\w+#-]*[ \t]*\n(.*?)```", re.DOTALL)  # any language tag
 
-# CodeXGLUE's tokenisation splits some multi-char operators and drops the dot
-# in `X.class` / `Outer.this`, which Java's grammar rejects. These rules undo
-# only those artefacts and are applied identically to predictions and targets.
-_DETOK_RULES = [
-    (re.compile(r"- >"), "->"),
-    (re.compile(r": :"), "::"),
-    (re.compile(r"> > >"), ">>>"),
-    (re.compile(r"> >"), ">>"),
-    (re.compile(r"< <"), "<<"),
-    # identifier followed by class/this, but not keywords like `return this`
-    (re.compile(r"\b(?!(?:return|new|throw|case|else|do|yield|assert|final|static|abstract|public|private|protected)\b)"
-                r"(\w+) (class|this)\b"), r"\1.\2"),
-]
-
-
-def detokenize(code):
-    for pattern, repl in _DETOK_RULES:
-        code = pattern.sub(repl, code)
-    return code
-
-
 def extract_code(text):
     """Strip a markdown code fence if the model produced one."""
     m = _FENCE.search(text)
@@ -51,7 +30,7 @@ def extract_code(text):
 
 
 def is_syntax_valid(code):
-    tree = _parser.parse((WRAPPER_OPEN + detokenize(code) + WRAPPER_CLOSE).encode("utf-8"))
+    tree = _parser.parse((WRAPPER_OPEN + code + WRAPPER_CLOSE).encode("utf-8"))
     return not tree.root_node.has_error
 
 
@@ -91,7 +70,7 @@ def load_jsonl(path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("predictions", help="JSONL with 'prediction' and 'target' fields")
+    parser.add_argument("predictions", help="JSONL with 'predictions' (first one is scored) and 'target' fields")
     parser.add_argument("--sanity", action="store_true",
                         help="score the targets against themselves (expects ~100%% validity, EM 100, CodeBLEU 1)")
     parser.add_argument("--per_sample_out", help="optional JSONL path for per-sample flags")
@@ -99,7 +78,7 @@ def main():
 
     rows = load_jsonl(args.predictions)
     targets = [r["target"] for r in rows]
-    preds = targets if args.sanity else [extract_code(r["prediction"]) for r in rows]
+    preds = targets if args.sanity else [extract_code(r["predictions"][0]) for r in rows]
     summary, per_sample = evaluate(preds, targets)
     print(json.dumps(summary, indent=2))
 
