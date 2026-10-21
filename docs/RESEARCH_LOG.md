@@ -822,6 +822,11 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Suggested to the user:** ask the professor which reading applies, presenting the table and the TSE precedent; offered to draft a factual email for the user to send. Fallbacks if strict: (a) keep Megadiff + HumanEval-Java citing TSE 2025, HumanEvalFix-Java as secondary; (b) return to Tufano's journal dataset (reopens #32–#36). No change until the professor answers.
 - **Still open from #53:** keep the HumanEval-Java descriptions unchanged (option a) — awaiting the user's confirmation.
 
+### 56. Email to the professor drafted (dataset requirement) ✅ draft
+- 2026-10-22: drafted at the user's request; the user sends it. Saved outside the repo (`thesis/emails/2026-10-22_professor_dataset_question.md`).
+- Content: why CodeXGLUE was dropped (abstracted code, no tests, naive copy 0.887 CodeBLEU, Java-only vs six languages); the proposed datasets with their venues; the RepairLLaMA IEEE TSE 2025 precedent; the question whether "published in a journal" means (a) introduced in a journal paper or (b) peer-reviewed/established and used in journal research.
+- To check before sending: the RepairLLaMA DOI on IEEE Xplore.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
