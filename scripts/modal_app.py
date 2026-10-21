@@ -1,9 +1,14 @@
 """Run any repository command on a Modal GPU container.
 
     pip install modal && modal token new            # once, on the local machine
-    modal run scripts/modal_app.py --cmd "bash scripts/dry_run.sh"
+    modal run scripts/modal_app.py --cmd "bash scripts/dry_run.sh"     # attached: stops if the laptop disconnects
     MODAL_GPU=L4 modal run scripts/modal_app.py --cmd "bash scripts/run_matrix.sh M1"
-    modal volume get thesis-results / results_modal  # download results
+
+    # Long jobs: deploy once, then start the job server-side; it no longer depends on the local client
+    modal deploy scripts/modal_app.py
+    python scripts/modal_app.py "bash scripts/run_matrix.sh"           # prints the call id; returns at once
+    modal app logs peft-code-eval                                      # follow the output
+    modal volume get thesis-results / results_modal                    # download results
 
 The container gets the local repository (including the gitignored data/*.jsonl built by
 src/data_loader.py), the pinned requirements, a default JDK (HumanEvalFix-Java), JDK 8 and the
@@ -55,3 +60,10 @@ def run(cmd: str):
 def main(cmd: str = "bash scripts/dry_run.sh"):
     print(f"GPU: {GPU} | command: {cmd}")
     run.remote(cmd)
+
+
+if __name__ == "__main__":  # start a job on the DEPLOYED app (see docstring)
+    import sys
+
+    call = modal.Function.from_name("peft-code-eval", "run").spawn(" ".join(sys.argv[1:]) or "bash scripts/dry_run.sh")
+    print(f"spawned {call.object_id} on GPU {GPU}: follow with `modal app logs peft-code-eval`")
