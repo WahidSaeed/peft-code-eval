@@ -840,7 +840,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Where:** on a Modal CPU container, not the laptop (only ~9.6 GB free disk; memory pressure earlier). `scripts/modal_app.py`: the CPU `score` job gets `unar` and a new volume `thesis-raw` for downloaded third-party archives. (A 200 GB scratch-disk request was rejected by Modal, whose minimum is 512 GiB; the default disk is used.)
 - **Download:** `code4bench.rar` (636 MB, Zenodo record 2582968), verified against the published MD5 `3ae77dfabec6e7a97ca7608c1aa41c04`, extracted on the volume.
 - **To measure:** Java faulty→accepted pairs and their diff sizes; test-case completeness (`isValid`); problems needing special checkers (multiple valid outputs); problem dates vs DeepSeek-Coder's training cut-off (contamination).
-- Results to follow in this entry.
+- ✅ **Download verified:** MD5 `3ae77dfabec6e7a97ca7608c1aa41c04` matches Zenodo. Extracted: 6.4 GB of MySQL dump files (`source` 5.9 GB, `realfaultslocations` 775 MB, `testcases` 72 MB, `problems` 16 MB, plus users/locations/languages/verdicts).
+- **Schema findings:**
+  - `testcases.inputdata` / `expectedresult` are `varchar(600)`: long Codeforces tests are stored truncated; `isValid` is `notValidated` / `fail` / `pass`.
+  - `realfaultslocations`: ~9.1 M faulty→accepted pairs (all languages; C/C++ also in a separate table), with change/insert/delete counts and line locations.
+  - `problems`: 2,990 problems with contest number and the HTML statement; `source`: submission, code, author, verdict, language, `sent` timestamp, duplicate flag.
+  - 41 languages (Java 8, Java 7, Java 6, Java 8 ZIP among them); verdict 2 = "Wrong answer on test".
+- 🔄 **Analysis running** (`analysis/feasibility/code4bench_feasibility.py`, Modal CPU job `fc-01M5G9XQ8SV5TMJGW86ZR2QNYD`, started ~00:10 CEST). It streams the dump without a database server; parsers unit-tested on sample rows first. Candidate rule: same author and problem, faulty verdict "Wrong answer on test", ≤ 6 changed lines, statement without multiple-answer/tolerance wording, all tests validated and untruncated.
 
 ### 59. Could the experiments run on the user's Mac? No ✅
 - **Asked by the user** (2026-10-22): how long would everything take on the local Mac instead of a cloud GPU?
