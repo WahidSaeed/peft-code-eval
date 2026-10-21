@@ -808,6 +808,20 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Defects that did affect everyone:** `ISCUBE` (buggy file identical to the fix: a free pass for any model returning the code unchanged, inflating all scores equally); `GET_ROW` (swapped package lines; effect depends on the build setup).
 - **For the thesis:** report the defects found (Table 3.d) as rigour; optionally report them upstream (GitHub issue on lin-tan/clm, only with the user's approval since it's a public post).
 
+### 55. Professor's requirement: "use a dataset published in a journal" ⚠️ ❓
+- **Raised by the user (2026-10-21):** their professor asks for datasets that have been published in a journal. Checked the venue of each dataset:
+
+| Dataset (role) | Venue of the dataset paper | Use in journal-published research |
+|---|---|---|
+| Megadiff (training) | **arXiv technical report** (Monperrus et al., 2021, arXiv 2108.04631), not peer-reviewed | **RepairLLaMA** (Silva, Fang, Monperrus), **IEEE TSE 2025**, DOI 10.1109/TSE.2025.3581062: fine-tunes on Megadiff, single-function pairs, deduplicated, total length < 1,024 tokens (30k–50k pairs) |
+| HumanEval-Java (test) | **ICSE 2023** (Jiang et al., DOI 10.1109/ICSE48619.2023.00125), peer-reviewed conference | The same **RepairLLaMA TSE 2025** evaluates on HumanEval-Java (**162** single-function bugs, the same clean set as ours, #38) |
+| HumanEvalFix-Java (test) | **ICLR 2024** (OctoPack), peer-reviewed conference | No journal use found in this check |
+| CodeXGLUE refinement (dropped, #39) | NeurIPS 2021 Datasets & Benchmarks; built from **Tufano et al., ACM TOSEM 2019** (journal) | — |
+
+- **Two readings of the requirement:** (strict) the dataset itself must come from a journal paper, which only CodeXGLUE/Tufano meets; (practical) the dataset must be established, peer-reviewed and used in journal research, which our design meets via the RepairLLaMA TSE 2025 precedent (Megadiff training + HumanEval-Java evaluation, same preprocessing). In SE, ICSE is a CORE A* venue.
+- **Suggested to the user:** ask the professor which reading applies, presenting the table and the TSE precedent; offered to draft a factual email for the user to send. Fallbacks if strict: (a) keep Megadiff + HumanEval-Java citing TSE 2025, HumanEvalFix-Java as secondary; (b) return to Tufano's journal dataset (reopens #32–#36). No change until the professor answers.
+- **Still open from #53:** keep the HumanEval-Java descriptions unchanged (option a) — awaiting the user's confirmation.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
