@@ -835,7 +835,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Assessment:** don't switch blindly. If the professor insists on the strict reading, the most useful role is an **additional journal-published, test-based Java benchmark** next to HumanEval-Java. Using it for training would turn the study into competitive programming.
 - **Proposed:** a CPU-only feasibility check like #38 (Java pair count and diff sizes, test completeness, special-checker share, problem dates vs DeepSeek-Coder's training cut-off), ~half a day. Awaiting the user's go-ahead.
 
-### 58. Code4Bench feasibility check 🔄
+### 58. Code4Bench feasibility check ✅
 - **User approved** the check proposed in #57 (2026-10-22).
 - **Where:** on a Modal CPU container, not the laptop (only ~9.6 GB free disk; memory pressure earlier). `scripts/modal_app.py`: the CPU `score` job gets `unar` and a new volume `thesis-raw` for downloaded third-party archives. (A 200 GB scratch-disk request was rejected by Modal, whose minimum is 512 GiB; the default disk is used.)
 - **Download:** `code4bench.rar` (636 MB, Zenodo record 2582968), verified against the published MD5 `3ae77dfabec6e7a97ca7608c1aa41c04`, extracted on the volume.
@@ -846,7 +846,22 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - `realfaultslocations`: ~9.1 M faulty→accepted pairs (all languages; C/C++ also in a separate table), with change/insert/delete counts and line locations.
   - `problems`: 2,990 problems with contest number and the HTML statement; `source`: submission, code, author, verdict, language, `sent` timestamp, duplicate flag.
   - 41 languages (Java 8, Java 7, Java 6, Java 8 ZIP among them); verdict 2 = "Wrong answer on test".
-- 🔄 **Analysis running** (`analysis/feasibility/code4bench_feasibility.py`). First attempt (job `fc-01M5G9XQ8SV5TMJGW86ZR2QNYD`) failed at once, "file not found": it ran on a warm container from the previous deployment, before the new script was deployed. Re-started as job `fc-01M5G9Z0HJMKFN6YV7772NZ19C` (~00:45 CEST) after confirming the file is in the container. It streams the dump without a database server; parsers unit-tested on sample rows first. Candidate rule: same author and problem, faulty verdict "Wrong answer on test", ≤ 6 changed lines, statement without multiple-answer/tolerance wording, all tests validated and untruncated.
+- 🔄 **Analysis running** (`analysis/feasibility/code4bench_feasibility.py`). First attempt (job `fc-01M5G9XQ8SV5TMJGW86ZR2QNYD`) failed at once, "file not found": it ran on a warm container from the previous deployment, before the new script was deployed. Re-started as job `fc-01M5G9Z0HJMKFN6YV7772NZ19C` (~00:45 CEST) after confirming the file is in the container.
+- ✅ **Results** (`results/code4bench_stats.json`; Java code also stored in `java.sqlite` on the `thesis-raw` volume for later use):
+  - **Problems:** 2,990; **610 (20%)** have statements with multiple-answer or error-tolerance wording (regex heuristic), so they need a special checker rather than exact output comparison.
+  - **Test cases:** 175,373 in total: pass 91,826 / fail 80,546 / notValidated 3,001. **81,151 (46%) are truncated** (600-character cap). Only **623 problems** have *all* their tests validated and untruncated.
+  - **Java submissions:** 205,113 (Java 8 154,087; Java 7 27,931; Java 6 22,988; Java 8 ZIP 107), submitted **2010–2017** (2017: 97,333; 2016: 51,636).
+  - **Java fault pairs:** 106,690 of 9,123,245 overall; all pair a user's own faulty and accepted submissions to the same problem; 105,132 unique. Faulty verdicts: wrong answer 71,156, time limit 15,162, runtime error 13,046, compilation error 5,139.
+  - ⚠️ **Change size: median 28 changed lines** (p75 68, p95 284). Only 22,568 (21%) change ≤ 6 lines (Megadiff: median 2, 81% ≤ 6). Most pairs are rewrites, not small fixes.
+  - **Strict candidate set** (same author and problem, faulty verdict "wrong answer", ≤ 6 changed lines, no multiple-answer/tolerance wording, all tests validated and untruncated): **7,052 pairs over 460 problems** (median 8 pairs per problem; contest ids 1–839).
+- **Assessment:**
+  - **As training data: not suitable.** Pairs are mostly rewrites; restricting to small fixes leaves 7k pairs over 460 problems, and the test sets would have to come from the same problems.
+  - **As an additional, journal-published, test-based evaluation set: feasible.** E.g. one wrong-answer bug per problem → up to ~460 Java bugs with complete stored tests (comparable to HumanEvalFix-Java + HumanEval-Java combined).
+  - ⚠️ **Contamination: high risk.** All submissions date from 2010–2017, years before DeepSeek-Coder's training data was collected, and Codeforces solutions are widely mirrored on GitHub. Results would need a contamination probe and a clear caveat.
+  - ⚠️ **Weaker tests:** only the tests shown on Codeforces are stored (the full hidden test sets aren't), so a fix that passes them can still be wrong.
+  - Not yet measured: token length of whole programs (with the problem statement, prompts may be long), and the effort of a stdin/stdout harness (~1–2 days).
+- ❓ **Decision pending** (user, possibly after the professor's reply): add Code4Bench as a third evaluation benchmark, or not.
+ It streams the dump without a database server; parsers unit-tested on sample rows first. Candidate rule: same author and problem, faulty verdict "Wrong answer on test", ≤ 6 changed lines, statement without multiple-answer/tolerance wording, all tests validated and untruncated.
 
 ### 59. Could the experiments run on the user's Mac? No ✅
 - **Asked by the user** (2026-10-22): how long would everything take on the local Mac instead of a cloud GPU?
