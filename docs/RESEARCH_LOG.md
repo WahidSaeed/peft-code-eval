@@ -846,7 +846,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - `realfaultslocations`: ~9.1 M faulty→accepted pairs (all languages; C/C++ also in a separate table), with change/insert/delete counts and line locations.
   - `problems`: 2,990 problems with contest number and the HTML statement; `source`: submission, code, author, verdict, language, `sent` timestamp, duplicate flag.
   - 41 languages (Java 8, Java 7, Java 6, Java 8 ZIP among them); verdict 2 = "Wrong answer on test".
-- 🔄 **Analysis running** (`analysis/feasibility/code4bench_feasibility.py`, Modal CPU job `fc-01M5G9XQ8SV5TMJGW86ZR2QNYD`, started ~00:10 CEST). It streams the dump without a database server; parsers unit-tested on sample rows first. Candidate rule: same author and problem, faulty verdict "Wrong answer on test", ≤ 6 changed lines, statement without multiple-answer/tolerance wording, all tests validated and untruncated.
+- 🔄 **Analysis running** (`analysis/feasibility/code4bench_feasibility.py`). First attempt (job `fc-01M5G9XQ8SV5TMJGW86ZR2QNYD`) failed at once, "file not found": it ran on a warm container from the previous deployment, before the new script was deployed. Re-started as job `fc-01M5G9Z0HJMKFN6YV7772NZ19C` (~00:45 CEST) after confirming the file is in the container. It streams the dump without a database server; parsers unit-tested on sample rows first. Candidate rule: same author and problem, faulty verdict "Wrong answer on test", ≤ 6 changed lines, statement without multiple-answer/tolerance wording, all tests validated and untruncated.
 
 ### 59. Could the experiments run on the user's Mac? No ✅
 - **Asked by the user** (2026-10-22): how long would everything take on the local Mac instead of a cloud GPU?
