@@ -77,6 +77,7 @@ pip install -r requirements.txt          # install the CUDA build of torch on GP
 
 # 1. HumanEval-Java source (BSD-3), pinned commit
 git clone https://github.com/lin-tan/clm data/clm && git -C data/clm checkout 662769e515cfd2a4980d7d4e98f4739ef6265b45
+tar xzf data/clm/humaneval-java/humaneval-java.tar.gz -C data/clm   # the repo ships HumanEval-Java as a tarball
 
 # 2. Build all data files (no GPU; ~7 min, mostly tokenising Megadiff for the length filter)
 python src/data_loader.py --output_dir data

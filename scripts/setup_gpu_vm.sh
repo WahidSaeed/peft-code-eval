@@ -19,6 +19,7 @@ python3 -m venv .venv
 if [[ ! -d data/clm ]]; then
   git clone -q https://github.com/lin-tan/clm data/clm
   git -C data/clm checkout -q 662769e515cfd2a4980d7d4e98f4739ef6265b45
+  tar xzf data/clm/humaneval-java/humaneval-java.tar.gz -C data/clm  # the repo ships it as a tarball
 fi
 
 .venv/bin/python - <<'EOF'
