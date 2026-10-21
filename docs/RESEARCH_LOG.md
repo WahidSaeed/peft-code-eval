@@ -466,6 +466,31 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Questions 6–11, and Biderman et al. (TMLR 2024, "LoRA Learns Less and Forgets Less", arXiv 2405.09673, verified) added as a source.
 - Both decisions remain ❓.
 
+### 36. Is CodeXGLUE the wrong training dataset? Candidate replacements ❓
+- **Context:** after #30–#35 the user proposed restarting the research. The assistant argued against a full restart: the novelty is confirmed (#29) and the pipeline is validated. The user identified the real concern as **"CodeXGLUE is the wrong dataset"** (no unit tests; abstracted `VAR_1` style unlike real assistant use; root cause of Problems 1 and 2).
+- **Key point:** the *training* data does not need unit tests. The *evaluation* needs tests, in a format close to the training data.
+- **Candidates checked (2026-10-21):**
+
+| Candidate | What it is | Tests? | Fit | Risks |
+|---|---|---|---|---|
+| **Keep CodeXGLUE** (status quo) | 52k abstracted Java method pairs | No | Pipeline done | Problems 1 and 2 stay; limitation "no test-based in-task correctness" |
+| **Megadiff single-function** (HF `ASSERT-KTH/megadiff-single-function`; RepairLLaMA's training source) | 72.4k real Java single-function changes from open-source commits; RepairLLaMA filtered to < 1,024 tokens and deduplicated → 30–50k | No (training only) | Real code, function-level, like HumanEvalFix-Java / HumanEval-Java. HumanEvalFix-Java becomes a near in-task test-based check; other 5 languages = cross-language transfer. Matches the APR literature (RepairLLaMA, Li, Machácek, Vallecillos-Ruiz eval on HumanEval-Java) | Commits include non-bug-fix changes (noise); licence not stated on the card; longer functions (≤ 1,024 tokens) would raise training memory and time vs our 512, or filter to ≤ 512 and accept a length bias |
+| **RunBugRun** (Prenner & Robbes, arXiv 2304.01102) | Competitive-programming buggy/fixed pairs from CodeNet etc., 8–9 languages, ~450k (v1; Java ≈ 17.6k) | **Yes**, stdin/stdout tests per problem, train/valid/test splits | The only option with train and test from the **same distribution with tests** | README: "revised and extended version" (v1 in a legacy branch, splits changed); no licence stated; SQLite dump + Bubblewrap sandbox; competitive programs, not real-project repair |
+| **xCodeEval APR** (Khan et al., ACL 2024) | Codeforces-based, multilingual, ExecEval engine | Yes | Tests in many languages | Licence ambiguous (card says both cc-by-4.0 and cc-by-nc-4.0); APR split details not on the card; Docker execution engine; competitive programming |
+| **FixEval** (Haque et al., arXiv 2206.07796) | AtCoder Java + Python buggy/fixed with tests | Yes | Java + tests | Smaller and older; competitive programming |
+
+- **Assistant's initial assessment (not a decision):** **Megadiff → HumanEvalFix (+ HumanEval-Java)** fits the thesis best:
+  - real Java bug-fix commits for training;
+  - unit-test evaluation on function-level Java in the same format;
+  - comparability with the APR papers already cited;
+  - it reuses everything except the data loader and the in-task similarity metrics.
+
+  RunBugRun is the strongest *methodologically* (same-distribution tests) but carries version, licence and infrastructure risk, and competitive programs are less realistic.
+- **Proposed next step:** a CPU-only feasibility check before deciding:
+  - Megadiff: licence, token-length distribution under the DeepSeek tokenizer, duplicate/near-duplicate rate, overlap with HumanEval;
+  - HumanEval-Java: format and how its tests run.
+- ❓ Awaiting the user.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
