@@ -793,6 +793,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Arguments for keeping the descriptions unchanged (option a):** it's the benchmark's own text (for most of these tasks); no intervention by us; identical for every model; renaming a public method breaks its callers, so it's a genuine repair mistake; the instruction asks for the *corrected method*, not a renamed one.
 - **Arguments against:** in these tasks the benchmark's text itself is inconsistent, which pushes models towards renaming; and the effect may differ between M0 and fine-tuned models (signature copying), which could bias the gain.
 - **Proposed before deciding:** measure the size of the effect with a diagnostic-only re-score of the saved M0 samples in which renamed methods are renamed back (not a harness rule, never used for reported results). If few renamed samples would pass anyway, option (a) costs almost nothing.
+- ✅ **Diagnostic run (user approved, 2026-10-21 ~23:30 CEST):** `analysis/diagnostics/rename_diagnostic.py` on Modal CPU, job `fc-01M5G6H16QJYAE05BV6RT85SAX` → `results/pilot/M0_pilotA10_rename_diagnostic.json`. Diagnostic only; never part of scoring.
+  - Of 3,260 M0 samples, **48 renamed the method** (same name spelled differently: `get_closest_vowel` 20, `minSubArraySum` 18, `sortedListSum`/`sortedList` 6, `words_string` 4). **27 returned a different method altogether** (MATCH_PARENS: `match_parens` instead of the buggy helper `check`, 13; FIND_ZERO: the helper `poly` instead of `find_zero`, 11; SORTED_LIST_SUM: `list_sort`, 3). Renaming those back would be meaningless, so they weren't re-run.
+  - Renamed back, **13 of the 48 pass**: MIN_SUBARRAY_SUM 8/18, SORTED_LIST_SUM 5/6, GET_CLOSET_VOWEL 0/20, WORDS_STRINGS 0/4. The other 35 fail anyway (20 runtime errors, 14 wrong answers, 1 compile error), i.e. the model renamed *instead of* fixing the bug.
+  - **Effect on the score:** pass@1 64.79% → 65.18% (**+0.39 pp**); pass@10 81.94% → 82.55% (+0.61 pp), if every rename were forgiven.
+  - **Interpretation:** even in the worst case, where a fine-tuned model never renames and M0 always does, the descriptions shift the comparison by at most ~0.4 pp of pass@1, far below the ±6 pp sampling interval of a 163-task benchmark. The "different method" cases are a model error regardless of the descriptions.
+  - **Recommendation:** option (a), keep the benchmark's descriptions unchanged; report this diagnostic in the threats-to-validity chapter. Awaiting the user's decision.
+
 
 ---
 
