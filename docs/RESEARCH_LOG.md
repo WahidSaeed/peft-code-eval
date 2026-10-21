@@ -635,6 +635,15 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **RQ4:** the Pareto trade-off is defined as resource cost (VRAM, time, energy) vs. pass@1, instead of "functional code validity".
 - The rest of the plan (§4 benchmark: CodeXGLUE; §5 sequence length 512; §6A metrics; §7–§8 file names and schedule) is still the original text; see the README and this log for the current design.
 
+### 45. Research plan brought in line with the current design ✅
+- At the user's request, the rest of the plan (§1, §4–§8) now matches #37–#44:
+  - §4: Megadiff (cleaning, ≤ 768 tokens, file-path split, 10k/1k/1k) + HumanEvalFix-Java + HumanEval-Java; hardware AWS A10G with the one-GPU-model rule.
+  - §5: actual fixed hyperparameters (paged AdamW 32-bit, cosine + 3% warm-up, max length 768, clip 0.3, α = 2r) and the 3-seed design (16 evaluated models).
+  - §6: pass@1 / pass@10 (n = 20, T = 0.2) added as the primary RQ1 metrics; EM / CodeBLEU / syntax on Megadiff with greedy decoding and the naive-copy reference; latency defined as greedy batch-size-1.
+  - §7: the real repository layout.
+  - §8: schedule re-based. Week 1 ✅; week 2 = methodology freeze ✅ + GPU dry run (blocked on AWS); training in week 3, evaluation in week 4. The target finish (late November) is unchanged. Budget: ~110–150 GPU-h.
+- The CodeXGLUE / Defects4J / RunPod-Colab wording is gone from the plan. #44's note that "the rest of the plan is still the original text" no longer applies.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
