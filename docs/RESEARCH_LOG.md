@@ -743,6 +743,18 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - 🔄 **Re-scoring:** the **same saved samples** (no new generation) re-scored with harness v2 on Modal CPU, job `fc-01M5G29DKF97QXM34GTYBYDZSZ`, started ~22:40 CEST → `results/pilot/M0_pilotA10_tests_v2.json`. Results to follow in this entry; v1 numbers above are kept for transparency.
 - **Other actions today (2026-10-21):** hourly Vultr ticket check stopped at the user's request (the user follows the ticket); Modal spend limit not yet set (asked the user, $27.41 credit before M0); commits `cfce1b8` (harness fixes + scoring job).
 
+### 51. Terminology: what the "test harness" is ✅
+- **Asked by the user:** what "harness" means in #50.
+- **Definition:** the test-execution (evaluation) harness is the code that grades the model's answers: `src/execution.py`. For each candidate fix it:
+  1. extracts the Java code from the model's reply (drops explanations and code-block markers);
+  2. assembles a runnable program: HumanEvalFix-Java = the model's `Solution` class + the hidden test class `Main`; HumanEval-Java = the model's method spliced into the original class file in place of the buggy method;
+  3. compiles it with `javac` (failure → `compile_error`);
+  4. runs the unit tests with a time limit (`passed` / `failed` / `runtime_error` / `timeout`);
+  5. counts passes over the 20 samples per bug → pass@1 and pass@10.
+- **Why harness bugs matter:** a correct fix can be marked wrong if the program is assembled badly. This is what happened in #50 (duplicate `Main` class; imports pasted mid-file), and it lowered M0's HumanEvalFix-Java pass@1 to 44.42% against the published 52.2.
+- **How the harness is validated:** reference fixes must pass 100% (a known-correct answer failing means the harness is broken) and the buggy code 0% (buggy code passing means the tests can't detect the bug). This check is re-run after every harness change.
+- **Thesis wording:** "test-execution harness" or "evaluation harness".
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
