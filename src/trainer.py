@@ -144,6 +144,9 @@ def parse_args(argv=None):
     p.add_argument("--no_eval", action="store_true", help="skip per-epoch validation loss")
     p.add_argument("--log_csv", default="results/train_log.csv")
     p.add_argument("--no_gradient_checkpointing", action="store_true")
+    p.add_argument("--save_steps", type=int, default=200,
+                   help="checkpoint every N optimizer steps (full runs only), so an interrupted run resumes")
+    p.add_argument("--no_resume", action="store_true", help="ignore existing checkpoints in output_dir")
     for k, v in FIXED.items():  # overridable for debugging; overrides are recorded in the run config
         p.add_argument(f"--{k}", type=type(v), default=v)
     args = p.parse_args(argv)
@@ -199,8 +202,9 @@ def main(argv=None):
         gradient_checkpointing=False,  # already configured on the model in load_model()
         eval_strategy="no" if args.no_eval else ("steps" if args.max_steps > 0 else "epoch"),
         eval_steps=args.max_steps if args.max_steps > 0 else None,
-        save_strategy="epoch" if args.max_steps <= 0 else "no",
-        save_total_limit=1,
+        save_strategy="steps" if args.max_steps <= 0 else "no",
+        save_steps=args.save_steps,
+        save_total_limit=1,  # only the latest checkpoint (adapter + optimizer + scheduler + RNG state)
         logging_steps=10,
         report_to="none",
         dataloader_num_workers=2 if torch.cuda.is_available() else 0,
@@ -215,8 +219,17 @@ def main(argv=None):
         processing_class=tokenizer,
     )
 
+    # Resume after an interruption (lost pod, preemption): the latest checkpoint restores adapter,
+    # optimizer, scheduler, RNG and data position. Timing and energy then cover only the resumed part,
+    # so the run is flagged and its efficiency numbers are not used as official RQ3 values (#63).
+    # Only complete checkpoints: trainer_state.json is written last, so a save cut off mid-way is skipped.
+    checkpoints = sorted((c for c in out.glob("checkpoint-*") if (c / "trainer_state.json").exists()),
+                         key=lambda c: int(c.name.split("-")[-1]))
+    resume = str(checkpoints[-1]) if checkpoints and not args.no_resume else None
+    if resume:
+        print(f"resuming from {resume}")
     with GPUProfiler() as prof:
-        train_output = trainer.train()
+        train_output = trainer.train(resume_from_checkpoint=resume)
         steps = trainer.state.global_step
         eff_batch = args.per_device_train_batch_size * args.gradient_accumulation_steps
         samples = min(steps * eff_batch, len(train_ds) * args.num_train_epochs) if args.max_steps > 0 \
@@ -259,6 +272,7 @@ def main(argv=None):
         "eval_loss_per_eval": json.dumps([round(x, 4) for x in eval_losses]),
         "gpu_name": p.get("gpu_name"),
         "vram_cap_gib": args.max_vram_gib if vram_fraction else None,
+        "resumed_from": Path(resume).name if resume else "",
     }
     config = {"args": vars(args), "fixed_defaults": FIXED, "target_modules": TARGET_MODULES,
               "versions": _versions(), "result": row}

@@ -896,6 +896,19 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - The hardware subsection (#48) is rewritten around a **consumer** 24 GB card, which fits RQ2's "developer workstation" framing directly; threats: no ECC memory, community-cloud availability of one card model for about a week.
   - The user creates the RunPod account and adds payment; the pod is set up with `scripts/setup_gpu_vm.sh` and `requirements.lock.txt`; long jobs run inside `tmux` so a closed terminal can't stop them.
 
+### 63. Using the remaining Modal credit while the platform is open: checkpoint/resume, Phase 0 (Li et al.), end-to-end check 🔄
+- **User (2026-10-22):** use the Modal credit (~$22) in the meantime; approved three card-independent tasks. Speed, memory and energy from these runs are **not official**.
+- **#1 Checkpoint and resume (`src/trainer.py`) ✅ (CPU-tested):**
+  - Full runs save a checkpoint every `--save_steps` (default 200) optimizer steps; `save_total_limit=1`. On restart, the latest *complete* checkpoint (one with `trainer_state.json`) is resumed: adapter, optimizer, scheduler, RNG and data position. `--no_resume` ignores checkpoints.
+  - A resumed run is flagged (`resumed_from` column): its timing and energy cover only the resumed part, so it isn't used for official RQ3 values.
+  - **Bug found by the test:** killing the run while checkpoint-4 was being written left an incomplete folder, and the first version tried to resume from it ("Can't find a valid checkpoint"). Fixed by requiring `trainer_state.json` (written last). Re-test: the run killed mid-save resumed from checkpoint-2 and finished all 16 steps.
+- **#2 Phase 0: reproduce Li et al. (ASE 2024) on HumanEval-Java** (open decision 4, scope (a) of #28): validates our HumanEval-Java harness against a published number, as #50 did for HumanEvalFix-Java.
+  - **Their protocol** (read from `zjulgc/llmpeft4apr`): DeepSeek-Coder-6.7B-**Base**, fp16, their LoRA adapter (HF `survoltli/llmpeft4apr`, `deepseek_coder_6.7b/LoRA`); prompt template "@@ Instruction … @@ Response" with "Write a solution to the following coding problem: …" and buggy lines marked `// buggy lines start/end` (their `benchmarks/humaneval.json`, 163 tasks); **beam search, 10 beams, 10 returned**, `max_new_tokens` = prompt length + 256, prompt truncated at 1,024 tokens; each output cut at its last `}`. Validation: the patch replaces the task's "function range" lines in the buggy file, then the JUnit tests run (Maven, 10 s). **pass@k = a plausible patch among the top k beams**, over all 163 tasks (ISCUBE included).
+  - **Published target (their released result file):** **pass@1 = 70/163 = 42.94%**, **pass@10 = 109/163 = 66.87%**.
+  - **Our reproduction:** their generation protocol exactly (prompt, fp16, beams, truncation, post-processing); scoring with **our** harness (same splice semantics; JUnitCore with JDK 8 instead of Maven; our import hoisting, #50), on Modal's A10.
+  - **Acceptance rule, fixed before running:** both pass@1 and pass@10 within **±6 pp** of the published values → our HumanEval-Java harness is validated. Beam search is deterministic in principle, but fp16 numerics and library versions (theirs: torch 2.0.1, transformers 4.35.2, peft 0.6.2; ours: #49 lock file) can change beams, so exact equality isn't expected. Outside the band, in either direction → investigate (same checks as #52); no change to fit the number.
+- **#3 End-to-end check:** a short real training run through the full path (train with per-epoch validation and checkpoints, kill and resume on the GPU, save the adapter, generate on all three benchmarks with that adapter, score). Planned next.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
