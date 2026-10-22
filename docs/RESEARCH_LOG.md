@@ -875,6 +875,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - Running a GGUF 4-bit model through llama.cpp would be a different quantization method (not the one studied), inference only.
 - **The Mac's role:** data preparation, harness checks on reference code, analysis, writing. A rented NVIDIA GPU is required for training and evaluation.
 
+### 60. LinkedIn posts updated: posts 5 and 6 drafted ✅
+- 2026-10-22, at the user's request. Posts 1–4 re-checked against the log: still accurate, no changes needed.
+- **Post 5, "My model scored 44%. The bug was in my grader."** (#50–#53): M0 on HumanEvalFix-Java 44.4% → 53.1% vs the published 52.2 after fixing two grader bugs (461 duplicate `Main` classes; ~330 misplaced imports); the acceptance rule committed before re-scoring; the 100% / 0% self-check. Labelled as a pilot harness check, not a thesis result.
+- **Post 6, "The dry run"** (#38, #46): peak memory at rank 32 of 7.7 / 10.6 / 15.1 GB (4/8/16-bit); ~7.6 / 9.3 / 6.8 h per full training run; the out-of-memory error with 20 samples at once and the 2 × 10 fix; the cancelled job; batch 8 × 2 not faster; estimate 110–150 → 170–200 GPU-hours (~40% more); dry run ≈ $3.
+- Two errors caught in my own drafts before saving: post 6 first said "~100 GPU-hours planned" and "2×" (the log says 110–150 and ~40%), and its memory chart used 4-bit's rank-8 value (7.3) under a "rank 32" label (correct: 7.66). Both fixed.
+- GIFs generated with the same brand theme (`_tools/make_gifs.py`, `post5()` / `post6()`); posts live outside this repo (`linkedin-posts/`).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
