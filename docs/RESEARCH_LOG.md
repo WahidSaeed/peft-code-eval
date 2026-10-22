@@ -891,6 +891,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 ### 62. Platform: leaning to RunPod RTX 4090, final after the AWS check ❓
 - **Context (2026-10-22):** the university provides no compute funding (the user asked). Options ranked by cost to the user: AWS A10G $0 (appeal pending); Vultr A40 capped at 24 GiB ~$0–20 from its credit (limit ticket pending); **RunPod RTX 4090 ~$80–100** (estimated ~90–110 h at ~$0.90/h, assuming ~2× A10 speed; unverified); Modal A10 ~$170–190.
 - **User's leaning: RunPod RTX 4090 (24 GB)**, decided after tomorrow's AWS check (2026-10-23, 10:13). If AWS approves, all official runs go on the A10G instead.
+- **Update (2026-10-22): the Vultr option is closed.** The provider declined the monthly-limit increase because the account is new, and will only review again after 30 days, which is when its credit expires. Remaining: AWS A10G (pending) → RunPod RTX 4090 (leaning) → Modal A10.
 - **Consequences if RunPod is chosen:**
   - All official runs on one card model (RTX 4090); the first ~30 min on the card is a short dry run to confirm speed, memory and whether NVML's energy counter works on a GeForce card (the profiler falls back to power sampling otherwise).
   - The hardware subsection (#48) is rewritten around a **consumer** 24 GB card, which fits RQ2's "developer workstation" framing directly; threats: no ECC memory, community-cloud availability of one card model for about a week.
