@@ -25,7 +25,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
-| Phase 0: reproduce Tier-A papers | ✅ | Artifacts checked (#28): Li ✅ full, Huang ✅ code+data, Wei ❌ none; scope decision pending |
+| Phase 0: reproduce Tier-A papers | ✅ | Li et al. reproduced on HumanEval-Java (#63); Huang and Wei not reproduced, with reasons (#64); RepairLLaMA inference check deferred |
 | Pass@k in RQ1 | ✅ | pass@1 primary + pass@10 secondary, n = 20, T = 0.2 (#37, #39) |
 | Training data | ✅ | Megadiff replaces CodeXGLUE (#34–#39) |
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
