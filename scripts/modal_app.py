@@ -57,7 +57,7 @@ def run(cmd: str, require_gpu: str = REQUIRED_GPU):
     info = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version,power.limit,memory.total",
                            "--format=csv,noheader"], capture_output=True, text=True).stdout.strip()
     name = info.split(",")[0].strip()
-    if name != require_gpu:
+    if require_gpu != "any" and name != require_gpu:  # "any": pilot/diagnostic jobs only, never official runs
         raise RuntimeError(f"wrong GPU: got {name}, need {require_gpu}")  # Modal retries in a new container
     with open("/results/platform_log.csv", "a") as f:  # which board / driver / power limit ran which job
         f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%S")},modal,{info},"{cmd}"\n')
