@@ -949,6 +949,11 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   7. Citation verification (open item; several [TODO: verify] marks in this log).
 - **Suggested route:** thesis first (due 2026-11-25), then a ~10-page paper; leaning towards a journal (EMSE or JSS) that rewards a thorough multi-configuration study, or a workshop first for early feedback. Exact deadlines and policies to be checked on the venues' websites (not quoted here).
 
+### 66. Reference list consolidated ✅ (draft; verification pending)
+- **Asked by the user (2026-10-22):** which papers to cite. Draft list written outside the repo (`thesis/references.md`), grouped as: (A) datasets, benchmarks and reference numbers (Megadiff, RepairLLaMA TSE 2025, HumanEval-Java ICSE 2023, OctoPack, Codex/HumanEval for pass@k, StarCoder2 report for the 52.2, Li et al. ASE 2024); (B) methods, model and tools (LoRA, QLoRA, LLM.int8(), DeepSeek-Coder, CodeBLEU, software with versions); (C) closest related work from #29 (Vallecillos-Ruiz ICSME 2026, Huang TSE 2025, Weyssow TOSEM 2025, Wei FSE 2023, Macháček ICSME 2025, PAFT, FLAMES, Afrin review); (D) methodological sources (Tufano TOSEM 2019, CodeXGLUE, EvalPlus, Northcutt et al., Arcuri & Briand ICSE 2011 for statistics); (E) not cited as method (Code4Bench, APR-INSTRUCTION, pricing pages).
+- Each entry is marked ✅ (venue/identifier checked in this project, with the log entry) or ⚠️ (from memory or a secondary source, to verify on DBLP/ACM DL/IEEE Xplore). arXiv versions are to be replaced by published versions where they exist.
+- Note: the "This thesis" row of #29's positioning table still describes the old design (CodeXGLUE + HumanEvalFix in 6 languages); the current design is Megadiff + HumanEvalFix-Java + HumanEval-Java (#37–#61). The table is historical; the thesis version uses the current design.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
