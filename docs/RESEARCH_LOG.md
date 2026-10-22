@@ -896,7 +896,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - The hardware subsection (#48) is rewritten around a **consumer** 24 GB card, which fits RQ2's "developer workstation" framing directly; threats: no ECC memory, community-cloud availability of one card model for about a week.
   - The user creates the RunPod account and adds payment; the pod is set up with `scripts/setup_gpu_vm.sh` and `requirements.lock.txt`; long jobs run inside `tmux` so a closed terminal can't stop them.
 
-### 63. Using the remaining Modal credit while the platform is open: checkpoint/resume, Phase 0 (Li et al.), end-to-end check 🔄
+### 63. Using the remaining Modal credit while the platform is open: checkpoint/resume, Phase 0 (Li et al.), end-to-end check ✅
 - **User (2026-10-22):** use the Modal credit (~$22) in the meantime; approved three card-independent tasks. Speed, memory and energy from these runs are **not official**.
 - **#1 Checkpoint and resume (`src/trainer.py`) ✅ (CPU-tested):**
   - Full runs save a checkpoint every `--save_steps` (default 200) optimizer steps; `save_total_limit=1`. On restart, the latest *complete* checkpoint (one with `trainer_state.json`) is resumed: adapter, optimizer, scheduler, RNG and data position. `--no_resume` ignores checkpoints.
@@ -917,7 +917,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **Conclusion:** the overall pass@10 criterion was missed (+7.4 pp), and that is recorded as such. The investigation attributes the excess to a demonstrable defect in the reference measurement (13 tasks that could not compile at all in their setup), not to our harness; on comparable tasks our results agree within 3 pp. No change to our harness (rule 3 of #52). **Our HumanEval-Java harness is considered validated**, with this caveat reported. Phase 0 scope (a) of #28 is done; retraining their configuration (scope (b)) is not planned.
   - Our numbers come from our harness (JUnitCore, 3 s per test, import hoisting) versus their Maven run with a 10 s limit per task, a further source of small differences.
   - **Modal wrapper bugs found on the way:** (1) a job couldn't see a file uploaded with `modal volume put` because warm containers don't refresh a volume; jobs now call `results.reload()` at start; (2) after a redeploy, calls can still land on a warm container running the previous code version (as in #58), so a new script or fix may need a retry.
-- **#3 End-to-end check** (`scripts/e2e_check.sh`): 4-bit r=8 on 256 training pairs × 2 epochs with checkpoints every 5 steps; killed once a complete checkpoint exists, then resumed on the GPU (4-bit + paged optimizer); adapter saved; generation on all three benchmarks (6 tasks each) with that adapter; Megadiff scoring and unit-test scoring. First attempt (job `fc-01M5HV6GJR2K5X4PCNVV9N12FR`) never started: it required an "NVIDIA A10" and Modal handed out an **A10G six times in a row** (the reverse of #49). For pilot and diagnostic jobs the board doesn't matter, so `run()` now accepts `MODAL_REQUIRE_GPU=any`; official runs must still name one board. 🔄 Re-started as job `fc-01M5HVW0EDTZM2JAY49ZMFPG7J`.
+- **#3 End-to-end check** (`scripts/e2e_check.sh`): 4-bit r=8 on 256 training pairs × 2 epochs with checkpoints every 5 steps; killed once a complete checkpoint exists, then resumed on the GPU (4-bit + paged optimizer); adapter saved; generation on all three benchmarks (6 tasks each) with that adapter; Megadiff scoring and unit-test scoring. First attempt (job `fc-01M5HV6GJR2K5X4PCNVV9N12FR`) never started: it required an "NVIDIA A10" and Modal handed out an **A10G six times in a row** (the reverse of #49). For pilot and diagnostic jobs the board doesn't matter, so `run()` now accepts `MODAL_REQUIRE_GPU=any`; official runs must still name one board. Re-started as job `fc-01M5HVW0EDTZM2JAY49ZMFPG7J` (NVIDIA A10).
+  - ✅ **Passed every stage** (13:20–13:35 UTC, ~15 min):
+    1. Trained 4-bit r=8 on 256 pairs; killed once `checkpoint-5` was complete.
+    2. Resumed on the GPU from `checkpoint-5` (4-bit model + paged AdamW state restored) and finished: **32 global steps** (= 256 / 16 × 2 epochs, so no steps lost or repeated), validation loss per epoch [0.0697, 0.0679], adapter saved, `resumed_from = checkpoint-5` recorded. Its timing (1.23 samples/s) covers only the resumed part, as designed, so it isn't comparable with the dry run's 0.81.
+    3. Generated with the saved adapter on all three benchmarks (6 tasks each): no outputs hit max_new_tokens; Megadiff scored inline.
+    4. Unit tests ran on all 240 samples: HumanEvalFix-Java pass@1 80.8% / pass@10 83.3%, HumanEval-Java 55.8% / 66.7% (6 easy tasks after a tiny training run: a pipeline check, not a result).
+  - **The official pipeline now works end to end**, including recovery from an interrupted training run.
+
 
 ---
 
