@@ -885,7 +885,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 ### 61. Supervisor approves the dataset design ✅
 - **2026-10-22:** the supervisor replied to the email of #56 that IEEE TSE is a very good journal in this domain and, since the RepairLLaMA TSE 2025 study uses this setup, to go ahead. The user confirmed: "we are good with Megadiff".
 - **Decided:** training on **Megadiff** (filtered, #39); evaluation on **HumanEval-Java** and **HumanEvalFix-Java** (#37–#40, #53). The journal requirement (#55) is satisfied under the "used in journal-published research" reading, with RepairLLaMA (IEEE TSE 2025) as the precedent to cite.
-- **Code4Bench (#57–#58): not pursued.** It's no longer needed for the journal requirement, and its contamination risk and mostly rewrite-sized pairs argued against it anyway. The feasibility results stay in the log; the 6.4 GB extracted dump stays on the `thesis-raw` Modal volume for now (can be deleted to save storage).
+- **Code4Bench (#57–#58): not pursued.** It's no longer needed for the journal requirement, and its contamination risk and mostly rewrite-sized pairs argued against it anyway. The feasibility results stay in the log; the downloaded archive, the 6.4 GB extracted dump and `java.sqlite` were **deleted** from the `thesis-raw` Modal volume on 2026-10-22 (the user ran `modal volume rm thesis-raw code4bench -r`). The summary files (`code4bench_stats.json`, feasibility log, schema, inspection listing) are kept on `thesis-results`; the script can rebuild everything from Zenodo.
 - **For the thesis:** cite RepairLLaMA (Silva, Fang, Monperrus, IEEE TSE 2025, DOI 10.1109/TSE.2025.3581062 **[TODO: verify on IEEE Xplore]**) as the precedent for both datasets.
 
 ---
