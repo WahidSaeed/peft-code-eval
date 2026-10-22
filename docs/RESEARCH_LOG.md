@@ -965,6 +965,11 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Also found: **Kusama et al., ESEM 2025** (arXiv 2508.16499): int8 inference with small models on QuixBugs, no fine-tuning.
   - **To do:** read Lee et al.'s full text (needs institutional access) before finalising the positioning; re-run the novelty search before submission.
 
+### 68. Links added to the reference list ✅
+- 2026-10-22, user request: every entry in `thesis/references.md` now has links: the DOI (citable version), arXiv (free full text), and for datasets, models and artifacts their Hugging Face / GitHub / Zenodo pages.
+- **Link check (53 links):** 41 return OK directly. The 12 DOI links to ACM, IEEE and Wiley return 403/202 to automated requests (publisher bot-blocking); those DOIs were confirmed via Crossref in #67 and open normally in a browser.
+- Still missing (listed in the file): NeurIPS proceedings links for QLoRA and LLM.int8(), the ESEM 2025 DOI for Kusama et al., the ICSME 2026 DOI for Vallecillos-Ruiz et al. (not yet published).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
