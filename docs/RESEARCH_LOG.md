@@ -970,6 +970,12 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Link check (53 links):** 41 return OK directly. The 12 DOI links to ACM, IEEE and Wiley return 403/202 to automated requests (publisher bot-blocking); those DOIs were confirmed via Crossref in #67 and open normally in a browser.
 - Still missing (listed in the file): NeurIPS proceedings links for QLoRA and LLM.int8(), the ESEM 2025 DOI for Kusama et al., the ICSME 2026 DOI for Vallecillos-Ruiz et al. (not yet published).
 
+### 69. Reference list prepared as a Word document for the supervisor ✅
+- 2026-10-22, user request: `thesis/References_for_confirmation.docx` (outside this repo), A4 landscape, for the user to send to the supervisor.
+- **Contents:** thesis title and design in brief; 27 references in four tables (A datasets/benchmarks/reference values, B methods and model, C closest related work with Lee et al. IST 2026 highlighted, D methodological sources), each with its role in the thesis and clickable DOI/arXiv/dataset links; a note on Lee et al. with the proposed contribution statement (#67); four questions for the supervisor (completeness; citing arXiv preprints where no peer-reviewed version exists; Lee et al. as closest work and the contribution statement; journal vs ICSE version of Arcuri & Briand).
+- Internal markers (log numbers, verification codes) left out. Name and matriculation number are placeholders for the user to fill in.
+- Checks: passes the Office XML schema validation; first page previewed.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
