@@ -25,7 +25,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
-| Phase 0: reproduce Tier-A papers | ❓ | Artifacts checked (#28): Li ✅ full, Huang ✅ code+data, Wei ❌ none; scope decision pending |
+| Phase 0: reproduce Tier-A papers | ✅ | Artifacts checked (#28): Li ✅ full, Huang ✅ code+data, Wei ❌ none; scope decision pending |
 | Pass@k in RQ1 | ✅ | pass@1 primary + pass@10 secondary, n = 20, T = 0.2 (#37, #39) |
 | Training data | ✅ | Megadiff replaces CodeXGLUE (#34–#39) |
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
@@ -925,6 +925,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     4. Unit tests ran on all 240 samples: HumanEvalFix-Java pass@1 80.8% / pass@10 83.3%, HumanEval-Java 55.8% / 66.7% (6 easy tasks after a tiny training run: a pipeline check, not a result).
   - **The official pipeline now works end to end**, including recovery from an interrupted training run.
 
+
+### 64. Phase 0 closed; RepairLLaMA check deferred ✅
+- **User decision (2026-10-22):** close Phase 0 with the Li et al. reproduction (#63); do an inference-only RepairLLaMA check later, once the official training runs are under way.
+- **Rationale:** Phase 0's purpose is met: both harnesses agree with published numbers (HumanEvalFix-Java 53.1 vs 52.2, #50; HumanEval-Java within 3 pp of Li et al. on comparable tasks, #63), and a released adapter was run faithfully (146/163 identical top beams). Further reproductions would compete with ~7–8 days of official GPU time.
+- **Not reproduced, with reasons for the thesis:**
+  - **Huang et al. (IEEE TSE 2025):** would need retraining a different model family (InCoder/CodeGen, 8-bit QLoRA, ~10–20 GPU-h plus 1–2 days of setup) and adds no new check of our pipeline. Related work.
+  - **Wei et al. (FSE 2023):** no released artifact, so only a re-implementation would be possible; inference-only quantization for code generation. Related work.
+- **Deferred: RepairLLaMA (IEEE TSE 2025)** inference check: released LoRA adapters on Hugging Face (`ASSERT-KTH/RepairLLaMA-*`, CodeLlama-7B trained on Megadiff) and processed datasets (`ASSERT-KTH/repairllama-datasets`). It gives a same-data, same-benchmark anchor for the discussion chapter. ~1–2 GPU-h plus ~half a day to match their input representation; run on leftover Modal credit in parallel with the official runs, never blocking them.
 
 ---
 
