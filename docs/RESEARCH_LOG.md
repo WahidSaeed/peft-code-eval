@@ -933,6 +933,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Not reproduced, with reasons for the thesis:**
   - **Huang et al. (IEEE TSE 2025):** would need retraining a different model family (InCoder/CodeGen, 8-bit QLoRA, ~10–20 GPU-h plus 1–2 days of setup) and adds no new check of our pipeline. Related work.
   - **Wei et al. (FSE 2023):** no released artifact, so only a re-implementation would be possible; inference-only quantization for code generation. Related work.
+- **Venue check (asked by the user):** Li et al. ("Exploring Parameter-Efficient Fine-Tuning of Large Language Model on Automated Program Repair", Guochang Li, Chen Zhi, Jialiang Chen, Junxiao Han, Shuiguang Deng) is a **conference** paper, IEEE/ACM ASE 2024 (research track, Sacramento); arXiv 2406.05639 lists no journal reference, and no TOSEM/TSE extension was found (to be confirmed on DBLP/ACM DL before submission). This doesn't affect the supervisor's rule, which concerns datasets: Li et al. is used only to validate the harness (Phase 0), and their APR-INSTRUCTION data isn't used.
 - **Deferred: RepairLLaMA (IEEE TSE 2025)** inference check: released LoRA adapters on Hugging Face (`ASSERT-KTH/RepairLLaMA-*`, CodeLlama-7B trained on Megadiff) and processed datasets (`ASSERT-KTH/repairllama-datasets`). It gives a same-data, same-benchmark anchor for the discussion chapter. ~1–2 GPU-h plus ~half a day to match their input representation; run on leftover Modal credit in parallel with the official runs, never blocking them.
 
 ---
