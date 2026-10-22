@@ -617,6 +617,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 ### 41. AWS quota appeal: no answer yet ⏳
 - 2026-10-21: G/VT quotas still 0 (On-Demand and Spot; eu-central-1 and us-east-1). The support case shows no AWS reply since the appeal (2026-10-20 17:37 CEST).
 - User decision: **wait for AWS**; RunPod stays backlog. The GPU dry run (batch size and memory at max_length 768) waits for the approval.
+- 2026-10-22 ~10:30 (after the user re-authenticated; both CLI and console sessions had expired): quota still **0**, request still open, **no AWS reply** since the appeal (~41 h). Platform decision point: 2026-10-24.
 
 ### 42. Decision: greedy decoding for Megadiff Exact Match ✅
 - **User decision (2026-10-21), item 3 of #39:** the Megadiff test split is decoded **greedily (1 answer per bug)** and scored with Exact Match, CodeBLEU and syntax validity.
