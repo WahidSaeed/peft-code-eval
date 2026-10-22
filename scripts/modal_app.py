@@ -54,6 +54,7 @@ app = modal.App("peft-code-eval")
 def run(cmd: str, require_gpu: str = REQUIRED_GPU):
     """Runs `cmd` in the repo. Raises (so Modal retries in a fresh container) only for a wrong GPU or a lost
     container; a failing command returns its exit code instead, so it is never re-run automatically."""
+    results.reload()  # see files written by other jobs since this (possibly warm) container started
     info = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version,power.limit,memory.total",
                            "--format=csv,noheader"], capture_output=True, text=True).stdout.strip()
     name = info.split(",")[0].strip()
@@ -78,6 +79,8 @@ def run(cmd: str, require_gpu: str = REQUIRED_GPU):
 @app.function(image=image, volumes={"/results": results, "/raw": raw}, cpu=8, memory=16384, timeout=6 * 3600)
 def score(cmd: str):
     """CPU-only job for running unit tests on saved predictions (model-generated code runs here, not locally)."""
+    results.reload()  # a warm container doesn't see files written since it started (e.g. `modal volume put`)
+    raw.reload()
     env = {**os.environ, "HEJ_JAVA_HOME": "/opt/jdk8", "HEJ_LIB": "/opt/clm/humaneval-java/lib"}
     setup = "cd /root/repo && ln -sfn /results results && ln -sfn /opt/clm data/clm"
     try:
