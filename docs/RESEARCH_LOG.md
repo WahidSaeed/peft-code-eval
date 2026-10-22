@@ -976,6 +976,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Contents:** thesis title and design in brief; 27 references in four tables (A datasets/benchmarks/reference values, B methods and model, C closest related work with Lee et al. IST 2026 highlighted, D methodological sources), each with its role in the thesis and clickable DOI/arXiv/dataset links; a note on Lee et al. with the proposed contribution statement (#67); four questions for the supervisor (completeness; citing arXiv preprints where no peer-reviewed version exists; Lee et al. as closest work and the contribution statement; journal vs ICSE version of Arcuri & Briand).
 - Internal markers (log numbers, verification codes) left out. Name and matriculation number are placeholders for the user to fill in.
 - Checks: passes the Office XML schema validation; first page previewed.
+- **Update (user request):** question 5 added (Lee et al. has no preprint and the full text isn't accessible: can the university provide access, or should the author be asked for a copy?), and "No preprint available" added to Lee et al.'s row. Rebuilt; validation passes again.
 
 ---
 
