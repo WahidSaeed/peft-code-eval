@@ -882,6 +882,12 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - Two errors caught in my own drafts before saving: post 6 first said "~100 GPU-hours planned" and "2×" (the log says 110–150 and ~40%), and its memory chart used 4-bit's rank-8 value (7.3) under a "rank 32" label (correct: 7.66). Both fixed.
 - GIFs generated with the same brand theme (`_tools/make_gifs.py`, `post5()` / `post6()`); posts live outside this repo (`linkedin-posts/`).
 
+### 61. Supervisor approves the dataset design ✅
+- **2026-10-22:** the supervisor replied to the email of #56 that IEEE TSE is a very good journal in this domain and, since the RepairLLaMA TSE 2025 study uses this setup, to go ahead. The user confirmed: "we are good with Megadiff".
+- **Decided:** training on **Megadiff** (filtered, #39); evaluation on **HumanEval-Java** and **HumanEvalFix-Java** (#37–#40, #53). The journal requirement (#55) is satisfied under the "used in journal-published research" reading, with RepairLLaMA (IEEE TSE 2025) as the precedent to cite.
+- **Code4Bench (#57–#58): not pursued.** It's no longer needed for the journal requirement, and its contamination risk and mostly rewrite-sized pairs argued against it anyway. The feasibility results stay in the log; the 6.4 GB extracted dump stays on the `thesis-raw` Modal volume for now (can be deleted to save storage).
+- **For the thesis:** cite RepairLLaMA (Silva, Fang, Monperrus, IEEE TSE 2025, DOI 10.1109/TSE.2025.3581062 **[TODO: verify on IEEE Xplore]**) as the precedent for both datasets.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -896,4 +902,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
 11. GPU platform for the official runs: AWS A10G (if the appeal is approved) vs Modal A10 (#49). Check on 2026-10-22, 10:13.
-12. Professor's "journal-published dataset" requirement: email sent (#55, #56); awaiting reply. Code4Bench as an optional third test set (#57, #58) depends on it.
+12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
