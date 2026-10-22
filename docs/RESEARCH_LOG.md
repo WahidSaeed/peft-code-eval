@@ -936,6 +936,19 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Venue check (asked by the user):** Li et al. ("Exploring Parameter-Efficient Fine-Tuning of Large Language Model on Automated Program Repair", Guochang Li, Chen Zhi, Jialiang Chen, Junxiao Han, Shuiguang Deng) is a **conference** paper, IEEE/ACM ASE 2024 (research track, Sacramento); arXiv 2406.05639 lists no journal reference, and no TOSEM/TSE extension was found (to be confirmed on DBLP/ACM DL before submission). This doesn't affect the supervisor's rule, which concerns datasets: Li et al. is used only to validate the harness (Phase 0), and their APR-INSTRUCTION data isn't used.
 - **Deferred: RepairLLaMA (IEEE TSE 2025)** inference check: released LoRA adapters on Hugging Face (`ASSERT-KTH/RepairLLaMA-*`, CodeLlama-7B trained on Megadiff) and processed datasets (`ASSERT-KTH/repairllama-datasets`). It gives a same-data, same-benchmark anchor for the discussion chapter. ~1–2 GPU-h plus ~half a day to match their input representation; run on leftover Modal credit in parallel with the official runs, never blocking them.
 
+### 65. Conference vs journal, and what publishing the thesis requires ✅ (guidance)
+- **Asked by the user (2026-10-22).**
+- **Difference:** conference papers are short (~10 pages at ICSE/FSE/ASE), have fixed yearly deadlines and one review round; journal papers are long, open for submission at any time and go through several revision rounds. In SE, top conferences (CORE A*) are primary venues, as strong as top journals. A *journal extension* of a conference paper needs substantial new content (often quoted as ≥ ~30%) and must reference the conference version.
+- **Checklist for publishing this study:**
+  1. One-sentence novelty claim (bit-width × rank for APR with measured memory/speed/energy, #29).
+  2. Rigour: validated harnesses (#50, #63) and pre-registered acceptance rules (#52, #63) ✅; significance tests and effect sizes over seeds and bugs ⏳; threats to validity ⏳.
+  3. Replication package: public code ✅; Zenodo DOI at submission ⏳; dataset redistribution rules respected (Megadiff row IDs only) ✅.
+  4. **Double-blind venues:** the public GitHub repo and LinkedIn posts name the author; use an anonymised artifact link during review and check the venue's policy on publicising work under review (may affect the timing of results posts).
+  5. GISMA's rules on publishing thesis content, and the venue's prior-publication policy; agree authorship (supervisor) early.
+  6. **AI-use disclosure** required by ACM/IEEE policies (this project uses Claude extensively).
+  7. Citation verification (open item; several [TODO: verify] marks in this log).
+- **Suggested route:** thesis first (due 2026-11-25), then a ~10-page paper; leaning towards a journal (EMSE or JSS) that rewards a thorough multi-configuration study, or a workshop first for early feedback. Exact deadlines and policies to be checked on the venues' websites (not quoted here).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
