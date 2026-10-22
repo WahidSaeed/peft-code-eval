@@ -888,6 +888,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Code4Bench (#57–#58): not pursued.** It's no longer needed for the journal requirement, and its contamination risk and mostly rewrite-sized pairs argued against it anyway. The feasibility results stay in the log; the downloaded archive, the 6.4 GB extracted dump and `java.sqlite` were **deleted** from the `thesis-raw` Modal volume on 2026-10-22 (the user ran `modal volume rm thesis-raw code4bench -r`). The summary files (`code4bench_stats.json`, feasibility log, schema, inspection listing) are kept on `thesis-results`; the script can rebuild everything from Zenodo.
 - **For the thesis:** cite RepairLLaMA (Silva, Fang, Monperrus, IEEE TSE 2025, DOI 10.1109/TSE.2025.3581062 **[TODO: verify on IEEE Xplore]**) as the precedent for both datasets.
 
+### 62. Platform: leaning to RunPod RTX 4090, final after the AWS check ❓
+- **Context (2026-10-22):** the university provides no compute funding (the user asked). Options ranked by cost to the user: AWS A10G $0 (appeal pending); Vultr A40 capped at 24 GiB ~$0–20 from its credit (limit ticket pending); **RunPod RTX 4090 ~$80–100** (estimated ~90–110 h at ~$0.90/h, assuming ~2× A10 speed; unverified); Modal A10 ~$170–190.
+- **User's leaning: RunPod RTX 4090 (24 GB)**, decided after tomorrow's AWS check (2026-10-23, 10:13). If AWS approves, all official runs go on the A10G instead.
+- **Consequences if RunPod is chosen:**
+  - All official runs on one card model (RTX 4090); the first ~30 min on the card is a short dry run to confirm speed, memory and whether NVML's energy counter works on a GeForce card (the profiler falls back to power sampling otherwise).
+  - The hardware subsection (#48) is rewritten around a **consumer** 24 GB card, which fits RQ2's "developer workstation" framing directly; threats: no ECC memory, community-cloud availability of one card model for about a week.
+  - The user creates the RunPod account and adds payment; the pod is set up with `scripts/setup_gpu_vm.sh` and `requirements.lock.txt`; long jobs run inside `tmux` so a closed terminal can't stop them.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -901,5 +909,5 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
-11. GPU platform for the official runs: AWS A10G (if the appeal is approved) vs Modal A10 (#49). Check on 2026-10-22, 10:13.
+11. GPU platform for the official runs: AWS A10G if the appeal is approved on 2026-10-23, otherwise RunPod RTX 4090 (user's leaning, #62).
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
