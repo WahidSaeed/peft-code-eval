@@ -1075,6 +1075,18 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     - **Phase 0 status:** our HumanEval-Java harness now reproduces two independent studies: Li et al. ASE 2024 (within 3 pp on comparable tasks, #63) and RepairLLaMA IEEE TSE 2025 (exact). RepairLLaMA's adapter is the same model family (DeepSeek-Coder-6.7B) trained on the same data source (Megadiff), so its 55.8% pass@1 (beam search, FIM representation, base model) is a published reference point for the discussion chapter. It isn't directly comparable to our numbers: different prompt (FIM with the buggy lines marked vs our instruction prompt with a description), Base vs Instruct, beam vs sampling, LoRA on q/v only.
     - Modal usage this month: $24.79 of the $30 credit (~$5.2 left). (A) ≈ $14.4; (B) ≈ $1.4 including the invalid first attempt.
 
+### 76. Discussion: why the M2 pilot overfits after epoch 1; which checkpoint to evaluate ❓
+- **Training curve of the M2 pilot** (from `trainer_state.json`): mean train loss per epoch **0.084 → 0.063 → 0.035**; validation loss after each epoch **0.0835 → 0.0872 → 0.1045**. After epoch 1 train and validation loss are equal (healthy); from then on train loss halves while validation loss rises, the signature of memorisation.
+- **Why (explanation given to the user):**
+  1. **Most of each answer is a copy.** In the training targets a median **91%** of lines are unchanged from the buggy input (first 2,000 pairs). Those tokens are learned almost at once; the loss is driven by the few edited tokens, so a small change in the average (0.08 → 0.10) hides a large change on the edits.
+  2. **The edits of unseen bugs are hard to predict**; after epoch 1 the adapter can reduce training loss mainly by memorising the specific edits of the 10,000 training pairs it sees a 2nd and 3rd time.
+  3. **Enough capacity to memorise:** ~40M trainable LoRA parameters (r = 16, all linear layers) vs 10,000 examples.
+  4. **Label noise:** about 1 in 4 Megadiff changes aren't bug fixes (#38); they can't be learned from the input, only memorised.
+  5. **Little regularisation:** LR 2e-4 (QLoRA default; peak around the end of epoch 1, cosine decay after), weight decay 0, LoRA dropout 0.05. The hyperparameters are fixed by design (plan §5), not tuned for Megadiff.
+  6. **Over-confidence:** memorisation pushes probabilities to extremes; wrong-but-confident predictions on validation pairs are penalised heavily, so validation loss can rise even if the top answer doesn't get worse. Consistent with the collapse to 1–2 distinct samples (#73).
+- **Hypothesis for RQ1 (not tested):** memorisation may differ by rank (more capacity) and bit-width (quantisation noise as a regulariser), so the overfitting is part of what the matrix measures, not only a nuisance.
+- ❓ Checkpoint-selection decision (options A final / B best validation loss / C every epoch; assistant recommends B + epoch-3 check on M2/M5/M8, optionally an epoch-1 vs epoch-3 test on Modal's November credit) still open.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
