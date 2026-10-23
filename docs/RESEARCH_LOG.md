@@ -1032,6 +1032,15 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - 🔄 **(A) progress, 2026-10-23 16:50 CEST:** the first container (an **A10G**, started 12:04) was lost after ~1 h 14 min at step 282 (a Modal infrastructure event; our job didn't fail). Modal restarted it at 13:19 on an **A10**, and the trainer **resumed from `checkpoint-200`** as designed: the first real-world test of the resume path on a long run. Cost of the interruption: ~80 steps recomputed (~20 min). At 16:50: step 1,038/1,875, ~15 s/step → training ends ~20:20, then generation. The pilot's two parts ran on different boards (A10G, then A10), which is acceptable for a pilot (correctness only) but is exactly what official runs must never do (`gpu_name` and `platform_log.csv` record it). Modal usage so far this month: $15.19 of the $30 credit.
   - ⚠️ **Lesson for the official runs:** a container can be lost mid-run without warning. Resume from checkpoints works, but a resumed run's timing and energy cover only the resumed part (`resumed_from`, #63), so an official run that gets interrupted needs its RQ3 timing either re-measured or reported per segment. The same can happen on RunPod (host maintenance, community-cloud hosts).
 
+### 74. Posting about the research before submitting it ✅ (guidance)
+- **Asked by the user (2026-10-23):** is it OK to post about the research (LinkedIn, public repo) when it may later go to a conference or journal?
+- **Answer:** generally yes. Social-media posts and a public code repository are not "prior publication"; major SE venues (ACM, IEEE, Springer, Elsevier) also allow arXiv preprints. The constraints are about **double-blind review**, not about posting itself (extends #65, point 4):
+  1. **Before submission:** posting process, lessons and even results is fine. An arXiv preprint before submitting also timestamps the work.
+  2. **While under double-blind review** (ICSE, FSE, ASE and several journals use it): don't actively promote the paper (no new posts that clearly identify the submitted paper); submit with an anonymised artifact link (e.g. anonymous.4open.science) instead of the named GitHub repo; don't cite the public repo or LinkedIn posts in the paper as yours. Exact rules differ per venue and year: read the call for papers before submitting.
+  3. **Results posts:** agree with the supervisor first (likely co-author); label pilot numbers as pilots (posts 5–6 already do).
+  4. Never post private details (supervisor's name or emails, account or case IDs, costs of other projects), consistent with the public-log rule.
+  5. GISMA's rules on publishing thesis content apply as well (to check).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
