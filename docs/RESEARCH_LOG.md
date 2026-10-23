@@ -1022,4 +1022,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
 11. GPU platform for the official runs: AWS A10G if the appeal is approved on 2026-10-23, otherwise RunPod RTX 4090 (user's leaning, #62).
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
-13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions sent for the supervisor's approval (#71) ⏳.
+13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
