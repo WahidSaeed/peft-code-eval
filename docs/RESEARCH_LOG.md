@@ -1025,6 +1025,10 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **Published target (their released file, their harness):** plausible patch in the top beam **91/163 = 55.83%**, in the top 10 **134/163 = 82.21%**.
   - **Acceptance rule, fixed before running** (same as #63): both within **±6 pp** → our HumanEval-Java harness agrees with a second independent study; outside, in either direction → investigate with the #52 checks; no change to fit the number.
   - **Order:** (1) CPU only: their ground-truth fixed functions through our harness (scoring-path check) and their released generations scored by our harness; (2) GPU, after (A): our re-generation (~1–2 GPU-h), compared with theirs (identical top beams; pass@1/@10).
+  - ✅ **Step (1) done** (Modal CPU job `fc-01M5MA1KMGRJWDDY7JTX4W0ANR`, ~13:00 CEST, a few cents):
+    - **Scoring-path check:** their ground-truth fixed functions pass our harness in **162/163** tasks. The exception is ISCUBE: RepairLLaMA uses ASSERT-KTH's corrected fork of HumanEval-Java, where ISCUBE has a real bug (missing `Math.abs`) and the method is spelled `iscude`; in the lin-tan/clm version we use, the "buggy" file equals the fix (#38) and the method is `iscube`, so their function doesn't compile against our tests. ISCUBE is already excluded from our clean set (E3), so this changes nothing.
+    - **Their 1,630 released patches scored by our harness:** pass@1 **91/163**, pass@10 **134/163**, **identical to their own harness at the task level** (both 91 / 134). At the patch level, ours passes 626 patches and theirs 622 (4 more passes with ours, none of them changing a task's outcome).
+    - → Our HumanEval-Java grader reproduces a second, independent study's published numbers exactly, with no adjustment. Step (2), our own re-generation, follows after (A).
 
 ---
 
