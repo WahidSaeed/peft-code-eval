@@ -1054,6 +1054,18 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Commit messages rewritten with `git filter-branch --msg-filter`, removing only the trailer line. Checks before pushing: **0 trailers left; 91 commits kept; file contents byte-identical** to the previous tip (`git diff` empty); author fields unchanged.
   - Pushed with `--force-with-lease` (only if GitHub still had the expected tip). GitHub API afterwards: 0 commits with a co-author trailer.
 - **Consequence:** every commit ID changed. Old→new mapping kept outside the repo; the one ID cited in this log (#50, harness fixes) was updated to the new `79adefd`. IDs quoted in earlier chat messages no longer exist on GitHub.
+  - ✅ **(A) unit tests scored** (CPU job `fc-01M5NEB8…`, restarted once after a Modal preemption; exit 0). Pilot, one run, 4-bit r16, not a thesis result:
+
+| Benchmark | M0 pilot pass@1 / pass@10 | **M2 pilot pass@1 / pass@10** | compile errors (of 3,2xx samples) M0 → M2 |
+|---|---|---|---|
+| HumanEvalFix-Java (164) | 53.11 / 72.01 | **57.47 / 63.10** | 47 → 4 |
+| HumanEval-Java (163; clean 162) | 64.79 / 81.94 | **55.34 / 63.73** (clean 55.06 / 63.51) | 291 → 287 |
+
+    - ⚠️ **Sample diversity collapsed.** Distinct outputs among the 20 samples per bug (T = 0.2): HumanEvalFix-Java M0 12.1 → **M2 1.6** (109/164 bugs: all 20 identical); HumanEval-Java M0 17.7 → **M2 2.1** (75/163 all identical). So for the fine-tuned model pass@10 ≈ pass@1, and the pass@10 drop mostly reflects this, not a loss of repair ability. Fine-tuning sharpens the output distribution (consistent with the very low, rising validation loss); at T = 0.2 the samples are nearly greedy.
+    - **HumanEval-Java pass@1 −9.4 pp:** more wrong-logic answers (`failed` 815 → 1,079); compile errors unchanged. M2 copies the problem-description comment into its answer in **3,147/3,260** samples (M0: 0): the training format is "return the corrected method" and the description is part of the input (format caveat of #40). Mostly harmless (a comment above the method), but 27 samples end inside the comment (compile error). 94 samples hit the 512-token limit, in 5 tasks.
+    - **HumanEvalFix-Java pass@1 +4.4 pp**, and the adapter fixed the output format (compile errors 47 → 4).
+    - Per task (≥ 50 pp change in pass rate): HumanEval-Java 35 tasks worse / 15 better; HumanEvalFix-Java 18 worse / 24 better.
+    - ❓ **For discussion before the official runs (nothing decided):** (1) checkpoint selection (validation loss rises after epoch 1); (2) whether pass@10 at T = 0.2 still measures anything for fine-tuned models, e.g. adding a higher-temperature sampling run for pass@10 (Chen et al. found T ≈ 0.2 best for pass@1 and T ≈ 0.8 for large k), or keeping T = 0.2 and reporting the collapse as a finding; (3) the description comment in HumanEval-Java prompts vs the training format.
 
 ---
 
