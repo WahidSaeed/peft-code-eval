@@ -1015,6 +1015,12 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **One-GPU rule:** whichever platform starts the official runs keeps all of them; a later AWS approval would not be used for official runs.
 - ❓ Awaiting the user's decision.
 
+### 73. Remaining Modal credit used for two pilots before RunPod 🔄
+- **User decision (2026-10-23):** use all remaining Modal credit before moving to RunPod; run **(A)** a full-length pilot of one cell, then **(B)** the RepairLLaMA inference check (#64). The assistant set a **Modal spend limit of $0** in the dashboard at the user's request (workloads stop when the credit runs out instead of charging the card; storage still accrues). Credit left before the pilots: **$20.62** (October's $30 monthly credit; used so far $9.38, $0 charged).
+- **Why (A):** it tests the main open risk of #34 (does Megadiff fine-tuning help or hurt the test-based benchmarks relative to M0, or collapse to a floor?) before ~$90–180 of paid GPU time; it shows validation loss after each of the 3 epochs (overfitting); and it is the first full-length (~8 h) run with checkpoints. **Pilot only:** a different GPU model from the official runs, so none of its numbers are thesis results; correctness metrics are board-independent, so they are informative.
+- **(A) set-up:** `scripts/pilot_cell.sh M2` (new): M2 = 4-bit NF4, r = 16, seed 42, the full official recipe (3 epochs, 1,875 optimizer steps), then generation on Megadiff (greedy, scored inline), HumanEvalFix-Java and HumanEval-Java (20 samples, T = 0.2); every step skips if its output exists, so a retried container resumes. Outputs in `results/pilot/` (Modal volume). Unit tests afterwards in the CPU `score` job. Data checksums verified against `splits/README.md` before the start.
+- 🔄 Started 2026-10-23 ~12:10 CEST, Modal job `fc-01M5M3FV0YTJVNFAVDP7123ZDT` (`MODAL_REQUIRE_GPU=any`). Training speed: ~15.7 s per step → ~8.2 h of training (dry run on an A10: 14.6 s/step for M1). Estimated cost of (A): ~$10 training + ~$5 evaluation; (B) uses what remains.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
