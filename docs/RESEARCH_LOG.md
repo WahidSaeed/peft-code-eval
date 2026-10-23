@@ -978,6 +978,24 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - Checks: passes the Office XML schema validation; first page previewed.
 - **Update (user request):** question 5 added (Lee et al. has no preprint and the full text isn't accessible: can the university provide access, or should the author be asked for a copy?), and "No preprint available" added to Lee et al.'s row. Rebuilt; validation passes again.
 
+## 2026-10-23
+
+### 70. Supervisor: cite only Q1/Q2 journals or CORE A*/A/B conferences ⚠️ ❓
+- **Supervisor's reply** to the reference list (#69): prefer references published in good journals and conferences; most current entries are not peer-reviewed and should be replaced. Two columns to add: *Journal/conference* and *Quartile / CORE ranking*. Accept only **Q1/Q2 journals** or **CORE A\*, A or B conferences**.
+- **Rankings checked from primary sources (2026-10-23):**
+  - CORE portal, edition **ICORE2026**: ICSE A\*, FSE (was ESEC/FSE) A\*, ASE A\*, NeurIPS A\*, ICLR A\*, ICML A\*, ACL A\*, ICSME A, ESEM A.
+  - SCImago **SJR 2025** (Scopus data as of March 2026), Software category: IEEE TSE Q1, ACM TOSEM Q1, Information and Software Technology Q1, STVR Q2.
+- **Entries that are not peer-reviewed** (arXiv `journal_ref` empty for all; StarCoder2's PDF still says "under review at TMLR"): Megadiff, Chen et al. (Codex/HumanEval), StarCoder2, DeepSeek-Coder, CodeBLEU (Ren et al.), PAFT, Afrin et al. review.
+- **Replacement candidates found and verified:**
+  - **HumanEvalFix-Java reference value:** **WaveCoder** (Yu et al., ACL 2024, CORE A\*, DOI 10.18653/v1/2024.acl-long.280), Table 4, reports pass@1 for **Deepseek-instruct-6.7B: Java 57.3** (avg 50.5; bigcode-evaluation-harness). Its decoding for that row isn't marked (the table marks greedy in blue and n = 200 in red; this row is black, i.e. not specified). Our M0 (53.11, #50) is **−4.2 pp** from 57.3, inside the ±6 pp band. ⚠️ The acceptance rule (#52) was fixed against 52.2 (StarCoder2) *before* the re-scoring; that record stays as it is. WaveCoder would be an additional, peer-reviewed reference point, not a re-run of the rule.
+  - **pass@k:** introduced by Kulal et al., *SPoC*, NeurIPS 2019 (A\*). The unbiased estimator itself comes from Chen et al. (preprint).
+  - **CodeBLEU:** used and described as the benchmark metric in CodeXGLUE (NeurIPS 2021 Datasets & Benchmarks track); Ren et al. is a preprint only.
+  - **Review papers:** Zhang et al., *A Systematic Literature Review on Large Language Models for Automated Program Repair*, ACM TOSEM 2026 (DOI 10.1145/3799693, Q1); Hou et al., *Large Language Models for Software Engineering: A Systematic Literature Review*, ACM TOSEM 2024 (DOI 10.1145/3695988, Q1). Either can replace the Afrin et al. preprint.
+  - Kusama et al. ESEM 2025 DOI found: 10.1109/ESEM64174.2025.00047.
+  - NeurIPS proceedings links: QLoRA (2023); LLM.int8() appears in the NeurIPS 2022 proceedings under the title **"GPT3.int8(): 8-bit Matrix Multiplication for Transformers at Scale"**, so the citation must use that title.
+- **No peer-reviewed replacement exists** for the base model (DeepSeek-Coder report) or the training data (Megadiff, already approved by the supervisor via RepairLLaMA TSE 2025, #61).
+- ❓ **For the user to decide** before the revised document is built: (1) WaveCoder as the cited reference value, and what happens to the StarCoder2 52.2; (2) whether to ask the supervisor for a small, justified exception list (model, dataset, pass@k estimator) or replace/drop them; (3) drop PAFT and the Afrin review, add Zhang et al. TOSEM 2026; (4) CodeBLEU cited via CodeXGLUE.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -993,3 +1011,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
 11. GPU platform for the official runs: AWS A10G if the appeal is approved on 2026-10-23, otherwise RunPod RTX 4090 (user's leaning, #62).
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
+13. References: only Q1/Q2 journals or CORE A*/A/B conferences (supervisor, #70). Replacements and exceptions to decide.
