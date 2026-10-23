@@ -752,7 +752,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **HumanEvalFix-Java: 53.11% vs the published 52.2 (+0.9 pp), inside the ±6 pp band of #52 → harness validated.**
   - Remaining HumanEvalFix-Java compile errors (47) are model mistakes: broken `switch` syntax, type errors, a public `Solution` class.
   - HumanEval-Java: 122 of the remaining 291 compile errors are `cannot find symbol`, and most come from **the problem descriptions, not the model or the harness**; see #53.
-- **Other actions today (2026-10-21):** hourly Vultr ticket check stopped at the user's request (the user follows the ticket); Modal spend limit not yet set (asked the user, $27.41 credit before M0); commits `cfce1b8` (harness fixes + scoring job).
+- **Other actions today (2026-10-21):** hourly Vultr ticket check stopped at the user's request (the user follows the ticket); Modal spend limit not yet set (asked the user, $27.41 credit before M0); commits `79adefd` (harness fixes + scoring job).
 
 ### 51. Terminology: what the "test harness" is ✅
 - **Asked by the user:** what "harness" means in #50.
@@ -1046,6 +1046,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     - **Megadiff test (greedy, n = 1,000):** EM **8.8%** (M0 pilot 3.1%), CodeBLEU **0.860** (M0 0.741; naive copy 0.876), syntax validity **99.5%** (M0 87.1%; ceiling 99.8%).
     - **Generation:** HumanEvalFix-Java 0 outputs hit max_new_tokens; ⚠️ **HumanEval-Java 94 of 3,260** samples hit the 512-token limit (M0: 6), so the adapter sometimes doesn't stop; effect on pass@k to be checked when scored.
     - 🔄 Unit tests: CPU `score` job `fc-01M5NEB8AKMRNDD4BHKEZXT263`; its first container was **preempted** by Modal (KeyboardInterrupt in the log; "Container terminated due to preemption"); Modal restarts it with the same input.
+
+### 75. Commit history rewritten: AI co-author trailers removed ✅
+- **User decision (2026-10-23/24):** commits must not carry an AI co-author trailer, because it suggests the assistant did all the work. From now on commit messages carry no attribution lines (also set in the local Claude Code settings). AI assistance is disclosed in the thesis and any paper, as ACM/IEEE policies require (#65), not in commit metadata.
+- **Done (2026-10-24 ~00:50 CEST), with the user's explicit approval:**
+  - Full backup first: a git bundle of the old history (verified complete), kept outside the repo.
+  - Commit messages rewritten with `git filter-branch --msg-filter`, removing only the trailer line. Checks before pushing: **0 trailers left; 91 commits kept; file contents byte-identical** to the previous tip (`git diff` empty); author fields unchanged.
+  - Pushed with `--force-with-lease` (only if GitHub still had the expected tip). GitHub API afterwards: 0 commits with a co-author trailer.
+- **Consequence:** every commit ID changed. Old→new mapping kept outside the repo; the one ID cited in this log (#50, harness fixes) was updated to the new `79adefd`. IDs quoted in earlier chat messages no longer exist on GitHub.
 
 ---
 
