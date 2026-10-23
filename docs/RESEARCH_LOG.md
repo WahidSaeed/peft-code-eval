@@ -1066,6 +1066,11 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     - **HumanEvalFix-Java pass@1 +4.4 pp**, and the adapter fixed the output format (compile errors 47 → 4).
     - Per task (≥ 50 pp change in pass rate): HumanEval-Java 35 tasks worse / 15 better; HumanEvalFix-Java 18 worse / 24 better.
     - ❓ **For discussion before the official runs (nothing decided):** (1) checkpoint selection (validation loss rises after epoch 1); (2) whether pass@10 at T = 0.2 still measures anything for fine-tuned models, e.g. adding a higher-temperature sampling run for pass@10 (Chen et al. found T ≈ 0.2 best for pass@1 and T ≈ 0.8 for large k), or keeping T = 0.2 and reporting the collapse as a finding; (3) the description comment in HumanEval-Java prompts vs the training format.
+  - ⚠️ **(B) step 2, first attempt invalid** (GPU job `fc-01M5NF3M…`; scoring job `fc-01M5NFBY…`): our regenerated patches scored pass@1 = pass@10 = 1/163 with 1,558/1,630 compile errors and **0** top beams identical to theirs. Inspection: the fills were empty or degenerate (e.g. `\x08` control characters). Not a result; a set-up error.
+    - **Cause found: the BOS token.** In our pinned `transformers` 5.20.2 the DeepSeek-Coder tokenizer **no longer adds BOS** to plain text (its `tokenizer_config.json` says `add_bos_token: true`; older versions, as used by RepairLLaMA, honoured it). The reproduction script tokenized the FIM prompt as plain text, so the model saw no BOS.
+    - ✅ **Our own pipeline is not affected:** training and evaluation prompts are rendered with the chat template, which inserts the BOS itself; checked: every prompt starts with exactly one BOS (id 32013).
+    - The Li et al. reproduction (#63) also tokenized plain text without BOS, yet matched their top beam in 146/163 tasks, so that check stands; the missing BOS is noted as an unintended deviation there.
+    - **Fix:** the script now prepends BOS explicitly and asserts exactly one. Re-run (generation + scoring in one job) into `results/phase0_repairllama_bos/`: job `fc-01M5NFZ3FYME3HQR61T6XSSKYS`. The acceptance rule is unchanged.
 
 ---
 

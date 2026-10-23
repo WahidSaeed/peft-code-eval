@@ -68,7 +68,12 @@ def generate(out_dir):
         if name in out:
             continue
         assert prompt.startswith(FIM_BEGIN) and prompt.endswith(FIM_END) and prompt.count(FIM_HOLE) == 1, name
-        inputs = tok(prompt, return_tensors="pt").to("cuda")
+        # transformers 5 no longer adds DeepSeek-Coder's BOS for plain text (add_bos_token is ignored); their
+        # environment did, and without it the FIM prompts degenerate (RESEARCH_LOG #73), so prepend it explicitly
+        ids = [tok.bos_token_id] + tok(prompt, add_special_tokens=False)["input_ids"]
+        assert ids[0] == tok.bos_token_id and ids.count(tok.bos_token_id) == 1, name
+        inputs = {"input_ids": torch.tensor([ids], device="cuda")}
+        inputs["attention_mask"] = torch.ones_like(inputs["input_ids"])
         n = inputs["input_ids"].shape[1]
         with torch.no_grad():
             gen = model.generate(**inputs, max_length=4096, num_beams=10, num_return_sequences=10,
