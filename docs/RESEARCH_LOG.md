@@ -618,6 +618,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - 2026-10-21: G/VT quotas still 0 (On-Demand and Spot; eu-central-1 and us-east-1). The support case shows no AWS reply since the appeal (2026-10-20 17:37 CEST).
 - User decision: **wait for AWS**; RunPod stays backlog. The GPU dry run (batch size and memory at max_length 768) waits for the approval.
 - 2026-10-22 ~10:30 (after the user re-authenticated; both CLI and console sessions had expired): quota still **0**, request still open, **no AWS reply** since the appeal (~41 h). Platform decision point: 2026-10-24.
+- 2026-10-23 ~11:40: quota still **0** (On-Demand and Spot, eu-central-1 and us-east-1), request still open, **no AWS reply** since the appeal (~66 h). Platform decision: see #72.
 
 ### 42. Decision: greedy decoding for Megadiff Exact Match ✅
 - **User decision (2026-10-21), item 3 of #39:** the Megadiff test split is decoded **greedily (1 answer per bug)** and scored with Exact Match, CodeBLEU and syntax validity.
@@ -1007,6 +1008,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Document** (outside this repo): `thesis/References_for_confirmation_v2.docx`, with the supervisor's six columns (#, Reference, Role in Thesis, Journal/Conference, Quartile/CORE ranking, Links), a "what changed" list, a note on the reference value, and four questions (list complete; accept the exceptions; Lee et al. as closest work + contribution statement; access to Lee et al.'s full text). Passes the Office XML validation; first page previewed. `thesis/references.md` rewritten to match.
 - ⏳ The user sends it to the supervisor (fill in the matriculation number first).
 
+### 72. AWS still hasn't answered; platform decision due ❓
+- **2026-10-23 check:** GPU quota still 0; the support case shows no AWS reply since the appeal of 2026-10-20 (~66 h). AWS gives no timeline.
+- **Why it can't wait much longer:** the official campaign needs ~170–200 GPU-h (#46), about 7–8 days of continuous GPU time on one card, and the thesis is due 2026-11-25. Each day of waiting comes out of analysis and writing time.
+- **Options (#62):** (a) RunPod RTX 4090 now (user's leaning; ~$0.90/h; total roughly $90–180 depending on how much faster the 4090 is than the A10, which the 30-minute card check will measure); (b) wait a few more days for AWS ($0 from credit, but no timeline); (c) Modal A10 (~$170–190; Modal's "A10" type also hands out A10Gs, so every job must pin the board, #49/#63).
+- **One-GPU rule:** whichever platform starts the official runs keeps all of them; a later AWS approval would not be used for official runs.
+- ❓ Awaiting the user's decision.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1020,6 +1028,6 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
-11. GPU platform for the official runs: AWS A10G if the appeal is approved on 2026-10-23, otherwise RunPod RTX 4090 (user's leaning, #62).
+11. GPU platform for the official runs: AWS still silent on 2026-10-23 (#72); RunPod RTX 4090 is the user's leaning (#62). ❓
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
