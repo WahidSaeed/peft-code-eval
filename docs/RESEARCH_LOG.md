@@ -994,7 +994,18 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Kusama et al. ESEM 2025 DOI found: 10.1109/ESEM64174.2025.00047.
   - NeurIPS proceedings links: QLoRA (2023); LLM.int8() appears in the NeurIPS 2022 proceedings under the title **"GPT3.int8(): 8-bit Matrix Multiplication for Transformers at Scale"**, so the citation must use that title.
 - **No peer-reviewed replacement exists** for the base model (DeepSeek-Coder report) or the training data (Megadiff, already approved by the supervisor via RepairLLaMA TSE 2025, #61).
-- ❓ **For the user to decide** before the revised document is built: (1) WaveCoder as the cited reference value, and what happens to the StarCoder2 52.2; (2) whether to ask the supervisor for a small, justified exception list (model, dataset, pass@k estimator) or replace/drop them; (3) drop PAFT and the Afrin review, add Zhang et al. TOSEM 2026; (4) CodeBLEU cited via CodeXGLUE.
+- ❓ **For the user to decide** before the revised document is built: (1) WaveCoder as the cited reference value, and what happens to the StarCoder2 52.2; (2) whether to ask the supervisor for a small, justified exception list (model, dataset, pass@k estimator) or replace/drop them; (3) drop PAFT and the Afrin review, add Zhang et al. TOSEM 2026; (4) CodeBLEU cited via CodeXGLUE. → decided in #71.
+
+### 71. Decisions on the references; revised list built for the supervisor ✅ (supervisor ⏳)
+- **User decision (2026-10-23), accepting the recommendations of #70:**
+  1. **WaveCoder (ACL 2024)** is cited as the reference value for M0 on HumanEvalFix-Java (57.3). The StarCoder2 report stays only as a documented exception, because the acceptance rule of #52 was fixed against its 52.2 before the re-scoring. The rule's outcome is unchanged (53.11, validated); the thesis reports both values (M0 is +0.9 pp from 52.2 and −4.2 pp from 57.3).
+  2. **Ask the supervisor for four exceptions**, each cited only for a stated role: DeepSeek-Coder report (the model), Megadiff (training data), Chen et al. (unbiased pass@k estimator), StarCoder2 (the pre-registered reference value).
+  3. **Dropped:** PAFT, the Afrin et al. review. **Added:** Zhang et al., ACM TOSEM 2026 (LLM-based APR review); Kulal et al., NeurIPS 2019 (origin of pass@k).
+  4. **CodeBLEU** is cited via CodeXGLUE (NeurIPS 2021 D&B); Ren et al. is dropped.
+  - Also: Arcuri & Briand cited with the ICSE 2011 version (A\*) instead of STVR (Q2); LLM.int8() cited with its NeurIPS proceedings title "GPT3.int8()".
+- **Result:** 27 references. Sections A–D (23): 14 CORE A\* conferences, 3 CORE A, 6 Q1 journals (TSE ×2, TOSEM ×3, IST); Section E: 4 requested exceptions. No Q2 or B entries remain.
+- **Document** (outside this repo): `thesis/References_for_confirmation_v2.docx`, with the supervisor's six columns (#, Reference, Role in Thesis, Journal/Conference, Quartile/CORE ranking, Links), a "what changed" list, a note on the reference value, and four questions (list complete; accept the exceptions; Lee et al. as closest work + contribution statement; access to Lee et al.'s full text). Passes the Office XML validation; first page previewed. `thesis/references.md` rewritten to match.
+- ⏳ The user sends it to the supervisor (fill in the matriculation number first).
 
 ---
 
@@ -1011,4 +1022,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
 11. GPU platform for the official runs: AWS A10G if the appeal is approved on 2026-10-23, otherwise RunPod RTX 4090 (user's leaning, #62).
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
-13. References: only Q1/Q2 journals or CORE A*/A/B conferences (supervisor, #70). Replacements and exceptions to decide.
+13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions sent for the supervisor's approval (#71) ⏳.
