@@ -25,7 +25,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
-| Phase 0: reproduce Tier-A papers | ✅ | Li et al. reproduced on HumanEval-Java (#63); Huang and Wei not reproduced, with reasons (#64); RepairLLaMA inference check deferred |
+| Phase 0: reproduce Tier-A papers | ✅ | Li et al. reproduced on HumanEval-Java (#63); RepairLLaMA DeepSeek-LoRA reproduced exactly, 91/134 (#73); Huang and Wei not reproduced, with reasons (#64) |
 | Pass@k in RQ1 | ✅ | pass@1 primary + pass@10 secondary, n = 20, T = 0.2 (#37, #39) |
 | Training data | ✅ | Megadiff replaces CodeXGLUE (#34–#39) |
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
@@ -1071,6 +1071,9 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     - ✅ **Our own pipeline is not affected:** training and evaluation prompts are rendered with the chat template, which inserts the BOS itself; checked: every prompt starts with exactly one BOS (id 32013).
     - The Li et al. reproduction (#63) also tokenized plain text without BOS, yet matched their top beam in 146/163 tasks, so that check stands; the missing BOS is noted as an unintended deviation there.
     - **Fix:** the script now prepends BOS explicitly and asserts exactly one. Re-run (generation + scoring in one job) into `results/phase0_repairllama_bos/`: job `fc-01M5NFZ3FYME3HQR61T6XSSKYS`. The acceptance rule is unchanged.
+  - ✅ **(B) step 2, re-run with BOS: reproduced exactly** (job `fc-01M5NFZ3FYME3HQR61T6XSSKYS`, A10, bf16): our regenerated patches, scored by our harness: pass@1 **91/163 (55.83%)**, pass@10 **134/163 (82.21%)**, identical to their published 91 / 134 (difference 0.0 pp; rule ±6 pp → **passed**). Our top beam equals theirs in **154/163** tasks, all 10 beams in 53 (bf16 vs their fp32 and library versions shift some lower beams). Per task, the top-beam outcome differs in 4 tasks and the pass@10 outcome in 2, and these cancel out in the totals.
+    - **Phase 0 status:** our HumanEval-Java harness now reproduces two independent studies: Li et al. ASE 2024 (within 3 pp on comparable tasks, #63) and RepairLLaMA IEEE TSE 2025 (exact). RepairLLaMA's adapter is the same model family (DeepSeek-Coder-6.7B) trained on the same data source (Megadiff), so its 55.8% pass@1 (beam search, FIM representation, base model) is a published reference point for the discussion chapter. It isn't directly comparable to our numbers: different prompt (FIM with the buggy lines marked vs our instruction prompt with a description), Base vs Instruct, beam vs sampling, LoRA on q/v only.
+    - Modal usage this month: $24.79 of the $30 credit (~$5.2 left). (A) ≈ $14.4; (B) ≈ $1.4 including the invalid first attempt.
 
 ---
 
