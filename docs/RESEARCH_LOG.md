@@ -1040,6 +1040,12 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   3. **Results posts:** agree with the supervisor first (likely co-author); label pilot numbers as pilots (posts 5–6 already do).
   4. Never post private details (supervisor's name or emails, account or case IDs, costs of other projects), consistent with the public-log rule.
   5. GISMA's rules on publishing thesis content apply as well (to check).
+  - ✅ **(A) training + generation finished** (2026-10-24 00:10 CEST; exit 0; Modal usage this month now $23.75 of $30, (A) cost ~$14.4). Pilot numbers, not thesis results (different GPU; resumed run):
+    - **Training:** 1,875 steps, 24,562 s excluding validation (the timing covers only the resumed part, `resumed_from = checkpoint-200`); peak VRAM 7.61 GiB allocated; final train loss 0.057.
+    - ⚠️ **Validation loss rises every epoch: 0.0835 → 0.0872 → 0.1045.** The adapter overfits after epoch 1, so the plan's 3-epoch adapter may be worse than the epoch-1 one. ❓ To discuss before the official runs (no epoch change proposed): e.g. keep 3 epochs but also save and evaluate the lowest-validation-loss checkpoint, with the selection rule fixed in advance.
+    - **Megadiff test (greedy, n = 1,000):** EM **8.8%** (M0 pilot 3.1%), CodeBLEU **0.860** (M0 0.741; naive copy 0.876), syntax validity **99.5%** (M0 87.1%; ceiling 99.8%).
+    - **Generation:** HumanEvalFix-Java 0 outputs hit max_new_tokens; ⚠️ **HumanEval-Java 94 of 3,260** samples hit the 512-token limit (M0: 6), so the adapter sometimes doesn't stop; effect on pass@k to be checked when scored.
+    - 🔄 Unit tests: CPU `score` job `fc-01M5NEB8AKMRNDD4BHKEZXT263`; its first container was **preempted** by Modal (KeyboardInterrupt in the log; "Container terminated due to preemption"); Modal restarts it with the same input.
 
 ---
 
