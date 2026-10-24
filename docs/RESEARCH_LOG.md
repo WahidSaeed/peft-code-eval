@@ -1103,7 +1103,12 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   3. **A different dataset is not recommended:** every APR dataset is copy-heavy (small edits), a switch would restart data work and need the supervisor's approval again, and nothing suggests another dataset would overfit less. Combining datasets would add heterogeneity (different code styles and edit types) and new contamination checks.
   4. **The standard remedies act on the recipe:** more data (the ~18k option), fewer epochs or a lower learning rate. Fewer epochs would change the plan's fixed 3 epochs, which the user chose to keep (#3); it is listed for completeness and is the user's call.
   5. **Recommendation unchanged:** final checkpoint (A) + ~18k training pairs, verified first by one M2 pilot on Modal's November credit; that pilot shows empirically whether more data reduces the overfitting and changes pass@k, before any RunPod money is spent.
-- ❓ Awaiting the user's confirmation.
+- ✅ **User decision (2026-10-24): "comfortable with what we have discussed".**
+  1. **Evaluate the final (epoch-3) checkpoint** of every model, identical rule for all; the per-epoch validation loss is reported and the overfitting is a threat to validity (and a measured property).
+  2. **Training set = every Megadiff pair whose file path is not in the validation or test split** (~18k instead of 10k); validation and test unchanged; token cap 768, prompts, recipe (3 epochs, LR 2e-4, etc.) unchanged.
+  3. **Before RunPod:** one M2 pilot with the larger training set on Modal's November credit (Starter plan: $30/month), compared with the 10k pilot (validation curve, Megadiff EM/CodeBLEU, pass@k).
+  - Still open (#73): pass@10 at T = 0.2 given the collapse in sample diversity; the description comment in HumanEval-Java prompts.
+- 🔄 Implementation: `data_loader.py` now fills test, then validation, then gives training every remaining path (`--train_size 0`, the default; `--train_size 10000` reproduces the #39 split). Rebuild running; checks to follow: validation/test byte-identical to the published checksums, old 10k train ⊂ new train, no path in two splits.
 
 ---
 
@@ -1120,4 +1125,5 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
 11. GPU platform for the official runs: AWS still silent on 2026-10-23 (#72); RunPod RTX 4090 is the user's leaning (#62). ❓
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
+15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.

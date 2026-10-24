@@ -4,7 +4,9 @@ Megadiff single-function (training + in-task test, RESEARCH_LOG #38/#39): real J
 commit changes (Monperrus et al., 2021) from the Hugging Face Hub. Trivial and
 duplicate pairs and pairs overlapping the test benchmarks are dropped, pairs longer
 than --max_length tokens are dropped (never truncated), and the rest is split by
-FILE PATH (every change to one file lands in one split) into 10k / 1k / 1k (seed 42).
+FILE PATH (every change to one file lands in one split): 1k test and 1k validation, then
+every remaining pair for training (~18k; seed 42; RESEARCH_LOG #77). --train_size N gives
+the earlier 10k subset (#39), whose validation and test splits are identical.
 
 HumanEvalFix-Java (evaluation only): 164 hand-written bugs from HumanEvalPack
 (Muennighoff et al., 2024), with unit tests. The prompt shows the buggy code and the
@@ -84,11 +86,12 @@ def sequence_length(tokenizer, prompt, target):
             + len(tokenizer(target, add_special_tokens=False)["input_ids"]) + 1)
 
 
-def load_megadiff(tokenizer, test_code, max_length=768, sizes=(10_000, 1_000, 1_000), seed=42):
+def load_megadiff(tokenizer, test_code, max_length=768, sizes=(None, 1_000, 1_000), seed=42):
     """Clean, filter and split Megadiff. Returns ({split: records}, counts of what was dropped).
 
     test_code: code of the evaluation benchmarks; Megadiff pairs sharing a 20-token
     sequence with any of it are dropped (contamination guard).
+    sizes: (train, validation, test); train None = every path not used by test or validation.
     """
     ds = load_dataset(MEGADIFF_ID, split="train")
     counts = {"rows": len(ds)}
@@ -124,6 +127,7 @@ def load_megadiff(tokenizer, test_code, max_length=768, sizes=(10_000, 1_000, 1_
     paths = sorted(by_path)
     random.Random(seed).shuffle(paths)
     names, targets = ("test", "validation", "train"), dict(zip(("train", "validation", "test"), sizes))
+    targets["train"] = targets["train"] or len(rows)  # None: all remaining paths
     splits, k = {name: [] for name in names}, 0
     for name in names:
         while k < len(paths) and len(splits[name]) < targets[name]:
@@ -327,7 +331,8 @@ def main():
     parser.add_argument("--hej_dir", default="data/clm/humaneval-java",
                         help="humaneval-java folder of a lin-tan/clm checkout (see README)")
     parser.add_argument("--hef_languages", nargs="+", default=["java"], choices=HEF_LANGUAGES)
-    parser.add_argument("--train_size", type=int, default=10_000)
+    parser.add_argument("--train_size", type=int, default=0,
+                        help="0 = every pair not in test or validation (#77); 10000 = the earlier subset (#39)")
     parser.add_argument("--val_size", type=int, default=1_000)
     parser.add_argument("--test_size", type=int, default=1_000)
     parser.add_argument("--seed", type=int, default=42)
@@ -354,7 +359,7 @@ def main():
 
     test_code = [r[k] for r in hef + hej for k in ("buggy", "target")]
     splits, counts = load_megadiff(tokenizer, test_code, args.max_length,
-                                   (args.train_size, args.val_size, args.test_size), args.seed)
+                                   (args.train_size or None, args.val_size, args.test_size), args.seed)
     print(f"Megadiff: {json.dumps(counts)}")
     for split in ("train", "validation", "test"):
         _write(out / f"megadiff_{split}.jsonl", splits[split])
