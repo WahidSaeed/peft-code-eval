@@ -16,7 +16,7 @@ Replication package for an MEng thesis (GISMA University of Applied Sciences, Be
 ## Experimental design
 
 - **Model:** `deepseek-ai/deepseek-coder-6.7b-instruct`
-- **Training + in-task test:** Megadiff single-function (Monperrus et al., 2021): real Java commit changes, one method each. After dropping trivial (whitespace/comment-only), duplicate and benchmark-overlapping pairs, and pairs over **768 tokens** (never truncated), **20,106** pairs remain. They are split **by file path** (all changes to one file land in one split) into 10,000 train / 1,000 validation / 1,000 test (seed 42). The test split gives Exact Match, CodeBLEU and syntax validity (greedy decoding).
+- **Training + in-task test:** Megadiff single-function (Monperrus et al., 2021): real Java commit changes, one method each. After dropping trivial (whitespace/comment-only), duplicate and benchmark-overlapping pairs, and pairs over **768 tokens** (never truncated), **20,106** pairs remain. They are split **by file path** (all changes to one file land in one split) into 1,000 test / 1,000 validation pairs and **18,106 training pairs** (every remaining pair; seed 42; research log #77). The test split gives Exact Match, CodeBLEU and syntax validity (greedy decoding).
 - **Test-based evaluation (Java only):** **HumanEvalFix-Java** (Muennighoff et al., ICLR 2024; 164 bugs) and **HumanEval-Java** (Jiang et al., ICSE 2023; 163 bugs, 162 clean), both with unit tests. **20 samples per bug** (temperature 0.2, top-p 0.95); **pass@1** (primary) and **pass@10** (secondary) from the same samples, using the unbiased estimator of Chen et al. (2021).
 - **Hardware:** one 24 GB NVIDIA GPU, with the same GPU model for every run
 

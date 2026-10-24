@@ -1108,7 +1108,10 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   2. **Training set = every Megadiff pair whose file path is not in the validation or test split** (~18k instead of 10k); validation and test unchanged; token cap 768, prompts, recipe (3 epochs, LR 2e-4, etc.) unchanged.
   3. **Before RunPod:** one M2 pilot with the larger training set on Modal's November credit (Starter plan: $30/month), compared with the 10k pilot (validation curve, Megadiff EM/CodeBLEU, pass@k).
   - Still open (#73): pass@10 at T = 0.2 given the collapse in sample diversity; the description comment in HumanEval-Java prompts.
-- 🔄 Implementation: `data_loader.py` now fills test, then validation, then gives training every remaining path (`--train_size 0`, the default; `--train_size 10000` reproduces the #39 split). Rebuild running; checks to follow: validation/test byte-identical to the published checksums, old 10k train ⊂ new train, no path in two splits.
+- ✅ Implementation: `data_loader.py` fills test, then validation, then gives training every remaining path (`--train_size 0`, the default; `--train_size 10000` reproduces the #39 split). Rebuilt locally (2026-10-24):
+  - **Training set: 18,106 pairs** (mean 484 tokens, p95 739, max 768; 0 truncated); validation 1,000 and test 1,000 **byte-identical** to the published checksums (as are both HumanEval files); all 10,000 pairs of the old training set are contained in the new one; **0 file paths** shared between training and validation/test. All 18,780 paths of the pool are now used.
+  - `splits/`: new `megadiff_train_rows.txt` (18,106 indices) and checksum; the old indices kept as `megadiff_train_rows_10k.txt` (the 10k pilot's data). README, research plan (§4, compute budget ~250–280 GPU-h) and the thesis dataset subsection (D6) updated.
+  - Local housekeeping: `data/clm/humaneval-java` was a symlink into the scratch folder wiped on 2026-10-22; it now points to the backed-up copy (identical: `humaneval_java.jsonl` checksum unchanged).
 
 ---
 
