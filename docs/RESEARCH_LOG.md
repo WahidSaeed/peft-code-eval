@@ -1130,6 +1130,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **What it would add that Phase 0 hasn't:** a check of a **4-bit QLoRA adapter served unmerged** against a published number. Phase 0 covered bf16/merged adapters (Li et al. #63, RepairLLaMA #73). Our own 4-bit path is exercised by the M2 pilot (#73), but not against an external anchor.
   - **Cheapest way to get that:** ask the authors for one trained adapter (CodeLlama 7B or Qwen2.5-Coder 7B) and run an inference-only check on HumanEval-Java with their prompt format and 10 beams, target 82/164 or 114/164 (~1–2 GPU-h). If they don't share one, cite the paper as related work, as for Huang et al. and Wei et al. (#64).
   - Decision pending with the user.
+- **2026-10-27: adapter request sent** by the user to the corresponding authors (first author in Cc), asking for one trained QLoRA adapter (CodeLlama 7B or Qwen2.5-Coder 7B), the HumanEval-Java patches and validation results, and the exact generation settings (`--num_beams 10` together with `--do_sample`: beam search or beam sampling?). Waiting for a reply. ⏳
 
 ---
 
@@ -1148,4 +1149,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
-16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). ❓
+16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
