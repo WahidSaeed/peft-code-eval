@@ -33,6 +33,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
 | Learning path | ✅ | `docs/LEARNING_PATH.md` |
 | RunPod fallback (RTX 4090, $0.90/h) | 📋 backlog | Only if AWS denies the appeal (#23) |
+| Megadiff token cap 1,024 (~25.7k training pairs) | 📋 backlog | Counted only; revisit after the 18k M2 pilot (#79) |
 | Public GitHub repo | ✅ | https://github.com/WahidSaeed/peft-code-eval (#18) |
 
 ---
@@ -1131,6 +1132,21 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **Cheapest way to get that:** ask the authors for one trained adapter (CodeLlama 7B or Qwen2.5-Coder 7B) and run an inference-only check on HumanEval-Java with their prompt format and 10 beams, target 82/164 or 114/164 (~1–2 GPU-h). If they don't share one, cite the paper as related work, as for Huang et al. and Wei et al. (#64).
   - Decision pending with the user.
 - **2026-10-27: adapter request sent** by the user to the corresponding authors (first author in Cc), asking for one trained QLoRA adapter (CodeLlama 7B or Qwen2.5-Coder 7B), the HumanEval-Java patches and validation results, and the exact generation settings (`--num_beams 10` together with `--do_sample`: beam search or beam sampling?). Waiting for a reply. ⏳
+
+### 79. Megadiff pair counts under larger token caps (1,024 as in RepairLLaMA) 📋 backlog
+- **Context:** the user asked why the study doesn't train on the full Megadiff (~663k changes, arXiv 2108.04631). Assistant's answer: most of those changes span several methods or non-method code, so they don't fit the buggy-method → fixed-method task; the HF single-function subset (72,393) is the part that does (RepairLLaMA uses it too); and training time scales with pairs (663k would be ~36× the 18k set). The binding limit inside the subset is the 768-token cap.
+- **Count (user request):** `analysis/feasibility/megadiff_token_caps.py` (CPU, local), same cleaning as `src/data_loader.py` (trivial 2,101, duplicates 5,458, benchmark overlap 84 → 64,750 clean pairs), same length definition (chat-formatted prompt + target + EOS, DeepSeek tokenizer). The 768 row reproduces the current pool exactly (20,106 pairs, 18,780 paths).
+
+| Cap | Pairs | File paths | Training pairs (2k held out) | Total tokens | Mean | Median |
+|---|---|---|---|---|---|---|
+| 768 (current) | 20,106 | 18,780 | 18,106 | 9.74M | 485 | 490 |
+| **1,024** | **27,707** | 25,601 | **25,707** | 16.53M | 596 | 592 |
+| 1,536 | 38,770 | 35,188 | 36,770 | 30.47M | 786 | 747 |
+| 2,048 | 45,701 | 40,832 | 43,701 | 42.75M | 935 | 857 |
+
+- **What 1,024 would cost (rough, A10-speed scaling, not measured):** ~1.75× the training tokens of the 18k set → training ~215 → **~375 GPU-h**, campaign **~410–440 GPU-h**; higher peak memory per step (longest sequence 768 → 1,024, untested on 24 GB for the 16-bit arm); a re-split, so validation/test and their checksums change.
+- ⚠️ **Not comparable to RepairLLaMA's 64,643 pairs:** they also filtered at < 1,024 tokens yet kept ~2.3× more pairs than this count. Their length is probably measured differently (e.g. per function rather than prompt + target together, or another tokenizer); not verified.
+- **User decision:** log as **backlog** for later; no change to the dataset now. Revisit after the 18k M2 pilot (#77) shows whether more data reduces the overfitting.
 
 ---
 
