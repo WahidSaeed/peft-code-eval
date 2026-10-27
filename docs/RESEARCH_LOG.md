@@ -1113,6 +1113,24 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - `splits/`: new `megadiff_train_rows.txt` (18,106 indices) and checksum; the old indices kept as `megadiff_train_rows_10k.txt` (the 10k pilot's data). README, research plan (§4, compute budget ~250–280 GPU-h) and the thesis dataset subsection (D6) updated.
   - Local housekeeping: `data/clm/humaneval-java` was a symlink into the scratch folder wiped on 2026-10-22; it now points to the backed-up copy (identical: `humaneval_java.jsonl` checksum unchanged).
 
+## 2026-10-27
+
+### 78. Lee et al. (IST 2026) read in full; should it be reproduced? ✅ (reading) ❓ (reproduction)
+- **Done:** the full text of Lee, Lee, Ji, Song, Im, *Automated Program Repair using Quantized Language Models and Parameter-Efficient Fine-Tuning*, IST 197 (2026) 108181, was obtained and read (13 pages). This closes the to-do of #67.
+- **What the full text confirms from #67:** QLoRA is compared only with **full fine-tuning**; the base is **4-bit NF4 only** (no 8-bit or 16-bit LoRA arm); LoRA rank is **fixed at r = 64, α = 16**, deliberately not searched (their §5.1); **no energy** measurement. Headline numbers: 51–71% less memory and 5–27% more plausible patches than full fine-tuning (CodeGen 6B, InCoder 6B); under 24 GB, a QLoRA CodeGen 16B gives 35% more plausible patches than a fully fine-tuned 6B, at 2.90× the inference time. → The novelty statement of #67 stands unchanged: no prior study isolates bit-width under an identical LoRA set-up, crossed with rank.
+- **Their set-up (for the comparison table):** training on the Recoder dataset (129,300 pairs, single-block Java fixes), one epoch, Adam 32-bit, dropout 0.1; models CodeGen 6B/16B, InCoder 6B, CodeLlama 7B/13B/34B, StarCoder2 7B, Qwen2.5-Coder 7B; RTX 4090 24 GB (CodeLlama 34B on an RTX A6000 48 GB); benchmarks Defects4J v1.2/v2.0 single-hunk (130 / 108), QuixBugs (40), HumanEval-Java (164); **10 patches per bug** (beam search), plausible if any passes all tests; each model trained 5 times, mean of the middle three. Best HumanEval-Java result: Qwen2.5-Coder 7B, 114/164; CodeLlama 7B 82/164. **DeepSeek-Coder is not among their models.**
+- ⚠️ **Findings that bear on our design:**
+  1. **Unmerged adapters are the only option for a 4-bit base:** merging the 16-bit LoRA weights into the 4-bit CodeGen 6B dropped HumanEval-Java from 77/164 to 2/164 (their §5.5). This supports `evaluator.py` serving every adapter unmerged (#26), and means RQ3's inference timings must be reported for that serving mode.
+  2. **Inference speed of QLoRA vs full fine-tuning depends on the architecture:** 1.51× slower for CodeGen 6B (joint QKV projection), 4.21× faster for InCoder 6B (separate Q/K/V). A hypothesis for RQ3, not a prediction for DeepSeek-Coder.
+  3. **Embedding layers stay 16-bit under QLoRA:** Qwen2.5-Coder's 151,646-token vocabulary costs 38% more peak memory than CodeLlama 7B. DeepSeek-Coder's vocabulary is ~32k, so this should matter little for RQ2, but it explains part of the gap between theoretical and measured 4-bit memory.
+  4. Manual check on QuixBugs: plausible ≈ correct (largest gap: CodeLlama 13B, 4 of 22 overfitting). They also report CodeBLEU, and note it under-rates correct but structurally different patches (StarCoder2), consistent with our use of CodeBLEU as secondary only.
+- **Replication package:** `github.com/knu-plml/apr-using-qlora` (no licence file; ~160 KB). Checked 2026-10-27: it contains training/inference/validation code and run commands, but **no trained adapters and no generated patches** (models are loaded from local paths); a run log mentions DeepSeek-Coder-V2-Lite, which is not in the paper.
+- **Question (user): should we reproduce this paper?** **Assistant's assessment (no decision yet):**
+  - **A full reproduction is not recommended.** With no released adapters, it means retraining: one QLoRA run of CodeLlama 7B on 129,300 pairs is ~2.4× our per-run training volume (129,300 vs 18,106 × 3 = 54,318 sample passes; ~30–35 GPU-h at the A10 speed of the pilot, before evaluation), on a different model, dataset and prompt format; their protocol trains each model 5 times; and the Defects4J half needs the full Defects4J setup. It would compete with the ~250–280 GPU-h of official runs before the 2026-11-25 deadline, and a match would validate *their* pipeline in our hands, not our study's design.
+  - **What it would add that Phase 0 hasn't:** a check of a **4-bit QLoRA adapter served unmerged** against a published number. Phase 0 covered bf16/merged adapters (Li et al. #63, RepairLLaMA #73). Our own 4-bit path is exercised by the M2 pilot (#73), but not against an external anchor.
+  - **Cheapest way to get that:** ask the authors for one trained adapter (CodeLlama 7B or Qwen2.5-Coder 7B) and run an inference-only check on HumanEval-Java with their prompt format and 10 beams, target 82/164 or 114/164 (~1–2 GPU-h). If they don't share one, cite the paper as related work, as for Huang et al. and Wei et al. (#64).
+  - Decision pending with the user.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1130,3 +1148,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
+16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). ❓
