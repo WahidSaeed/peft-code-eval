@@ -1161,7 +1161,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
-11. GPU platform for the official runs: AWS still silent on 2026-10-23 (#72); RunPod RTX 4090 is the user's leaning (#62). ❓
+11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); RunPod RTX 4090 is the user's leaning (#62). ❓
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
