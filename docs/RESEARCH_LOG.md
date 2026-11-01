@@ -1155,7 +1155,17 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **No other GPU source for now:** the AWS quota is still 0 (request open since 2026-10-20, no reply), Vultr is closed (#72), and RunPod stays in the backlog.
 - **AWS:** the user has been accepted into an AWS student programme and will ask about the GPU quota during onboarding. Useful details to give AWS: G and VT on-demand instances, 8 vCPUs, eu-central-1 (one g5.2xlarge), the existing quota request and appeal of 2026-10-20, about 250–280 GPU-h for the study (#77), and that the budget alert and an MFA-protected IAM user are already in place (#16, #17).
 - **What the credit covers:** the 18k-pair M2 pilot decided in #77 (estimated ~$23: ~14 h of training plus evaluation). It is a pilot on Modal hardware, so no official numbers come from it.
-- ❓ Pilot launch waiting for the user's go-ahead.
+- ✅ User approved the pilot launch (see #81).
+
+## 2026-11-02
+
+### 81. 18k-pair M2 pilot started on Modal 🔄
+- **User decision (2026-11-01): "yes, start the 18k M2 pilot"** (as planned in #77 and #80).
+- **Pre-flight:** all six local data files match the SHA-256 values in `splits/README.md` (training set 18,106 pairs). Recipe unchanged from the 10k pilot (#73): M2 = 4-bit NF4, r = 16, seed 42, 3 epochs, effective batch 16 → **3,396 optimizer steps** (10k pilot: 1,875), checkpoints every 200 steps, validation loss after each epoch. Evaluation on Megadiff (greedy), HumanEvalFix-Java and HumanEval-Java (n = 20, T = 0.2), the same as the 10k pilot so the two runs can be compared.
+- **Fix found before the launch:** `scripts/pilot_cell.sh` always named its run `<cell>_pilotA10`, the folder the 10k pilot already used, so the script would have found that adapter, skipped training and re-used the old outputs. The script now takes an optional tag (`bash scripts/pilot_cell.sh M2 pilotA10_18k`); the default keeps the old name.
+- **Launch:** Modal app redeployed (so the container has the new 18k data), job `fc-01M6CNNERGA319R58RZV50M0EC` spawned 2026-11-02 00:03 CET, `MODAL_REQUIRE_GPU=any` (pilot only, A10 or A10G). Outputs go to `results/pilot/runs/M2_pilotA10_18k/` and `results/pilot/predictions/M2_pilotA10_18k_*`.
+- **Expected:** at ~15–16 s per step, training takes **~14–15 h**, plus ~2–3 h of generation; cost about $20–23 of the $30 credit. The $0 spend limit means the job stops if the credit runs out; it would resume from its last checkpoint once credit is available again.
+- **Afterwards:** unit tests in the CPU `score` job, then a comparison with the 10k pilot (validation-loss curve, Megadiff EM/CodeBLEU, pass@1/pass@10).
 
 ---
 

@@ -3,7 +3,8 @@
 # seed 42) + generation on all three benchmarks, written to results/pilot/. Checks whether Megadiff
 # fine-tuning helps or hurts the test-based benchmarks before the official campaign. Not an official result
 # (other GPU model than the official runs); unit tests are scored afterwards in the CPU `score` job.
-#   bash scripts/pilot_cell.sh M2
+#   bash scripts/pilot_cell.sh M2               # 10k pilot (#73): M2_pilotA10
+#   bash scripts/pilot_cell.sh M2 pilotA10_18k  # 18k-pair pilot (#77, #81): its own folder, nothing skipped
 # Every step is skipped if its output exists, so a retried container resumes (training from its checkpoint).
 set -euo pipefail
 (( BASH_VERSINFO[0] >= 4 )) || { echo "needs bash >= 4 (associative arrays)"; exit 1; }
@@ -11,8 +12,8 @@ cd "$(dirname "$0")/.."
 
 declare -A BITS=( [M1]=4 [M2]=4 [M3]=4 [M4]=8 [M5]=8 [M6]=8 [M7]=16 [M8]=16 [M9]=16 )
 declare -A RANK=( [M1]=8 [M2]=16 [M3]=32 [M4]=8 [M5]=16 [M6]=32 [M7]=8 [M8]=16 [M9]=32 )
-cell="${1:?usage: pilot_cell.sh <cell>}"
-name="${cell}_pilotA10"
+cell="${1:?usage: pilot_cell.sh <cell> [tag]}"
+name="${cell}_${2:-pilotA10}"
 out="results/pilot/runs/$name"
 preds=results/pilot/predictions
 mkdir -p "$out" "$preds"
