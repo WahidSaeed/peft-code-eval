@@ -22,7 +22,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | `scripts/run_matrix.sh`, `scripts/evaluate_all.sh` | ✅ | Tested in a bash 5 container (#26) |
 | `src/execution.py` (pass@1, pass@10) | ✅ | HumanEvalFix-Java + HumanEval-Java: clean sets canonical 100 % / buggy 0 % (#39); other HEF languages validated in #22 |
 | GPU dry run | ✅ | Modal A10/A10G: all bit-widths fit 24 GB; ~170–200 GPU-h total (#46) |
-| AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15) |
+| AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15); user to raise it through an AWS student programme (#80) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
 | Phase 0: reproduce Tier-A papers | ✅ | Li et al. reproduced on HumanEval-Java (#63); RepairLLaMA DeepSeek-LoRA reproduced exactly, 91/134 (#73); Huang and Wei not reproduced, with reasons (#64) |
@@ -1148,6 +1148,15 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - ⚠️ **Not comparable to RepairLLaMA's 64,643 pairs:** they also filtered at < 1,024 tokens yet kept ~2.3× more pairs than this count. Their length is probably measured differently (e.g. per function rather than prompt + target together, or another tokenizer); not verified.
 - **User decision:** log as **backlog** for later; no change to the dataset now. Revisit after the 18k M2 pilot (#77) shows whether more data reduces the overfitting.
 
+## 2026-11-01
+
+### 80. Modal monthly credit reset; AWS quota to be raised through an AWS student programme ⏳
+- **Modal:** the Starter plan's monthly credit ($30) is available again from 2026-11-01. The $0 spend limit (#73) is still in place, so jobs stop when the credit runs out and nothing is charged.
+- **No other GPU source for now:** the AWS quota is still 0 (request open since 2026-10-20, no reply), Vultr is closed (#72), and RunPod stays in the backlog.
+- **AWS:** the user has been accepted into an AWS student programme and will ask about the GPU quota during onboarding. Useful details to give AWS: G and VT on-demand instances, 8 vCPUs, eu-central-1 (one g5.2xlarge), the existing quota request and appeal of 2026-10-20, about 250–280 GPU-h for the study (#77), and that the budget alert and an MFA-protected IAM user are already in place (#16, #17).
+- **What the credit covers:** the 18k-pair M2 pilot decided in #77 (estimated ~$23: ~14 h of training plus evaluation). It is a pilot on Modal hardware, so no official numbers come from it.
+- ❓ Pilot launch waiting for the user's go-ahead.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1161,7 +1170,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
-11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); RunPod RTX 4090 is the user's leaning (#62). ❓
+11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); user to ask during the AWS student programme onboarding (#80); RunPod RTX 4090 is the user's leaning (#62). ❓
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
