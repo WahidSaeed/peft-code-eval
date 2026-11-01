@@ -14,6 +14,7 @@ and one row per run is appended to a CSV log.
 """
 
 import argparse
+import hashlib
 import json
 import platform
 import sys
@@ -22,7 +23,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 import torch
-from datasets import load_dataset
+from datasets import Dataset
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
 from transformers import (
     AutoModelForCausalLM,
@@ -99,13 +100,20 @@ def lora_config(rank, alpha, dropout):
 
 
 def load_split(data_dir, subset, split, tokenizer, max_length, limit=None):
-    ds = load_dataset("json", data_files=str(Path(data_dir) / f"{subset}_{split}.jsonl"), split="train")
+    """Reads the JSONL into memory on every run. `load_dataset("json", ...)` caches by file path +
+    modification time, and Modal copies files with mtime 1970-01-01, so a changed file at the same path
+    silently loaded the old cached rows (RESEARCH_LOG #81). In-memory datasets read and write no cache files,
+    and the file's SHA-256 is returned so every run records exactly which data it trained on."""
+    raw = (Path(data_dir) / f"{subset}_{split}.jsonl").read_bytes()
+    sha256 = hashlib.sha256(raw).hexdigest()
+    rows = [json.loads(line) for line in raw.decode("utf-8").splitlines() if line.strip()]
     if limit:
-        ds = ds.select(range(min(limit, len(ds))))
-    tok = tokenize_for_training(ds, tokenizer, max_length)
+        rows = rows[:limit]
+    tok = tokenize_for_training(Dataset.from_list(rows), tokenizer, max_length)
     n_truncated = sum(tok["truncated"])
     n_tokens = sum(len(x) for x in tok["input_ids"])
-    return tok.remove_columns(["truncated"]), n_truncated, n_tokens
+    print(f"{split}: {len(rows)} rows from {subset}_{split}.jsonl (sha256 {sha256})")
+    return tok.remove_columns(["truncated"]), n_truncated, n_tokens, sha256
 
 
 def _warmup_kwargs(ratio):
@@ -167,11 +175,11 @@ def main(argv=None):
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
 
-    train_ds, n_truncated, n_train_tokens = load_split(
+    train_ds, n_truncated, n_train_tokens, train_sha256 = load_split(
         args.data_dir, args.subset, "train", tokenizer, args.max_length, args.train_limit)
-    eval_ds = None
+    eval_ds, val_sha256 = None, ""
     if not args.no_eval:
-        eval_ds, _, _ = load_split(args.data_dir, args.subset, "validation", tokenizer, args.max_length, args.eval_limit)
+        eval_ds, _, _, val_sha256 = load_split(args.data_dir, args.subset, "validation", tokenizer, args.max_length, args.eval_limit)
 
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
@@ -256,6 +264,8 @@ def main(argv=None):
         "global_steps": trainer.state.global_step,
         "n_train": len(train_ds),
         "n_train_truncated": n_truncated,
+        "train_data_sha256": train_sha256,
+        "val_data_sha256": val_sha256,
         **params,
         "model_load_s": round(load_s, 1),
         "static_vram_gib": static_vram_gib,
