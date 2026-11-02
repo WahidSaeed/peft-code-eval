@@ -1202,6 +1202,19 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - The save happens inside the timed training section; it takes seconds per epoch and is the same for every run, so RQ3 comparisons are unaffected.
   - **Not deployed to Modal yet:** the running 18k pilot (#81) keeps the image it started with; redeploy after it finishes, before any official run.
 
+### 84. Discussion: will all nine models overfit, and is it acceptable to study overfit models? ❓
+- **User's questions (2026-11-02):** what are the chances the other eight models also overfit, and is it a good idea to work with overfit models at all?
+- **Will the others overfit? Very likely, all or nearly all (assistant's assessment; not a measured probability).**
+  - The two pilots show the curve is set by the recipe and the data, not by the amount of data: doubling the training set left validation loss unchanged at every epoch (0.1045 at epoch 3 in both). The recipe (3 epochs, LR 2e-4, cosine) and the copy-heavy data (median 91% of target lines copied from the input, #76) are identical for all nine models.
+  - What varies is rank (8/16/32) and bit-width (4/8/16). Higher rank gives the adapter more capacity, so it may overfit sooner or more strongly; 4-bit quantization noise might act as a mild regularizer. Both are plausible, neither is established, and neither is likely to remove a rise this consistent. **How much each configuration overfits is unknown and is a result the study will measure** (validation loss per epoch for all nine, #83).
+- **Is it acceptable to study overfit models? Yes, with conditions (assistant's assessment):**
+  1. **The rising loss is at least partly overconfidence, not lost repair ability.** Validation loss is cross-entropy: once a model becomes very confident, each wrong token costs much more, so the loss can rise while the share of correct outputs holds or improves. Guo et al. (ICML 2017, "On Calibration of Modern Neural Networks") describe this (negative log-likelihood overfitting while classification error keeps falling). Our pilots fit that picture: sample diversity collapsed (1–2 distinct outputs out of 20, #73), and the 10k M2 still beat the untuned model on HumanEvalFix-Java (+4.4 pp pass@1) and on Megadiff EM (8.8% vs 3.1%). It also lost 9.4 pp on HumanEval-Java, so the effect is mixed, not harmless.
+  2. **The research questions are comparative and test-based** (#77): they ask how bit-width and rank change repair rates and cost under one fixed, pre-specified recipe. That stays valid for overfit models, as long as the overfitting is measured and reported for each configuration.
+  3. **Real limitations to report:** (a) pass@10 means little when the 20 samples are nearly identical (open question Q2, #73); (b) the results describe this training regime (3 epochs), not the best each configuration could reach; (c) reviewers may raise exactly this point, so the thesis must address it head-on.
+- **What would make the study robust (option for the user, not decided):** evaluate the saved `adapter-epoch1` of each of the nine models (#83) as a **secondary analysis**: same benchmarks, results reported next to the primary epoch-3 numbers. If the bit-width/rank conclusions are the same at epoch 1 and epoch 3, overfitting doesn't drive them; if they differ, that is a finding in itself. Cost: one extra evaluation pass per model (estimate after today's pilot timings); it doesn't change the primary design.
+- **Pending evidence today:** the 18k pilot's benchmark scores (versus the 10k pilot) show whether the identical loss curve also means identical repair rates.
+- ❓ Nothing decided; the epoch-1 secondary analysis is the user's call.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1220,4 +1233,5 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
 17. ~~1 epoch vs 3 epochs~~ → keep 3 epochs, final checkpoint primary, adapters saved at every epoch (#83).
+18. Secondary analysis: evaluate every model's epoch-1 adapter alongside the primary epoch-3 results? (#84) ❓
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
