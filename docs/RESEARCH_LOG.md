@@ -1186,7 +1186,19 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **D. Lower learning rate or more LoRA dropout.** Also recipe changes, but chosen without any validation evidence, so they would need another pilot. Not recommended given the time left.
   - **Not options:** changing rank (a study factor), a different dataset (#77), or per-model checkpoint selection (#77).
 - **Possible check for B:** a 1-epoch 18k M2 pilot (~4.6 h training + ~2.5 h generation, roughly $8). It may not fit in what is left of November's credit after this pilot (~$7–10), and if the credit runs out, the $0 spend limit stops the job.
-- ❓ **Nothing decided.** Revisit when the 18k pilot finishes (epoch-3 validation loss, pass@k).
+- ❓ **Nothing decided here;** resolved in #83 (3 epochs kept).
+
+### 83. Decision: keep 3 epochs; save each model's adapter at every epoch ✅
+- **User's concern (2026-11-02):** with only 1 epoch the study would look incomplete; reviewers could ask why only 1 epoch and why more epochs weren't tried to see whether the model improves.
+- **Assistant's assessment:** either choice draws a reviewer question (1 epoch: "why not more?"; 3 epochs: "why evaluate models that had already started to overfit?"), and either is answered with evidence: the pilots' per-epoch validation curves. Option B (#82) would be well supported by those curves, but **3 epochs has an advantage that #82 underplayed:** all nine configurations record validation loss after every epoch, so the thesis can show *how overfitting differs by bit-width and rank* (a finding in its own right), not just for M2. Risk flagged: 3 epochs on 18k is ~250–280 GPU-h, about 11 days of continuous GPU time, with 23 days to the deadline and no GPU platform yet, so the platform decision is urgent.
+- ✅ **User decision (2026-11-02): "yes".**
+  1. **Keep 3 epochs** on the 18k training set, final (epoch-3) checkpoint as the primary result, as in #77. Option B (1 epoch) is not pursued.
+  2. **Save each model's LoRA adapter at the end of every epoch** (`adapter-epoch1/2/3/`), next to the final `adapter/`. Storage only, no extra GPU time. If compute and time allow, the epoch-1 adapters can later be evaluated as a secondary analysis ("would less training have been better?"); nothing is committed to that yet.
+  - The overfitting is reported per configuration (validation loss per epoch for all nine models) and as a threat to validity.
+- ✅ **Implementation (`src/trainer.py`):** a `TrainerCallback` (`EpochAdapterSaver`) saves the adapter and tokenizer to `adapter-epoch<N>/` at the end of every epoch. Full-length runs only; dry runs with `--max_steps` stop mid-epoch, so they skip it. Adapter weights only, no optimizer state.
+  - **CPU test** (tiny Llama test model, 16-bit, r = 4, 32 training rows, 8 validation rows, 2 epochs, 4 steps): `adapter-epoch1` saved at step 2 and `adapter-epoch2` at step 4; `adapter-epoch2` is tensor-for-tensor identical to the final `adapter/`, and `adapter-epoch1` differs from it, as expected. The run record contains both data checksums (#81). The validation loss of the random test model barely moves in 4 steps; that test only checks the mechanics, not training quality.
+  - The save happens inside the timed training section; it takes seconds per epoch and is the same for every run, so RQ3 comparisons are unaffected.
+  - **Not deployed to Modal yet:** the running 18k pilot (#81) keeps the image it started with; redeploy after it finishes, before any official run.
 
 ---
 
@@ -1205,5 +1217,5 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
-17. If the 18k pilot overfits like the 10k pilot: keep 3 epochs (A) or train every model for 1 epoch (B, recommended) (#82). ❓
+17. ~~1 epoch vs 3 epochs~~ → keep 3 epochs, final checkpoint primary, adapters saved at every epoch (#83).
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓

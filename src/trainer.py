@@ -31,6 +31,7 @@ from transformers import (
     BitsAndBytesConfig,
     DataCollatorForSeq2Seq,
     Trainer,
+    TrainerCallback,
     TrainingArguments,
     set_seed,
 )
@@ -56,6 +57,22 @@ FIXED = {
     "weight_decay": 0.0,
     "max_grad_norm": 0.3,
 }
+
+
+class EpochAdapterSaver(TrainerCallback):
+    """Saves the LoRA adapter at the end of every epoch to <output_dir>/adapter-epoch<N>/ (RESEARCH_LOG #83).
+    The final adapter/ stays the primary result; the per-epoch copies allow a later secondary evaluation of
+    earlier epochs without retraining. Adapter weights only (no optimizer state), so the cost is storage."""
+
+    def __init__(self, out_dir, tokenizer):
+        self.out_dir, self.tokenizer = Path(out_dir), tokenizer
+
+    def on_epoch_end(self, args, state, control, model=None, **kwargs):
+        if state.is_world_process_zero and model is not None:
+            path = self.out_dir / f"adapter-epoch{round(state.epoch)}"
+            model.save_pretrained(str(path))
+            self.tokenizer.save_pretrained(str(path))
+            print(f"saved {path.name} (step {state.global_step})")
 
 
 def quantization_config(bits):
@@ -225,6 +242,8 @@ def main(argv=None):
         eval_dataset=eval_ds,
         data_collator=DataCollatorForSeq2Seq(tokenizer, label_pad_token_id=IGNORE_INDEX, padding=True),
         processing_class=tokenizer,
+        # full-length runs only; dry runs (--max_steps) stop mid-epoch
+        callbacks=[EpochAdapterSaver(out, tokenizer)] if args.max_steps <= 0 else None,
     )
 
     # Resume after an interruption (lost pod, preemption): the latest checkpoint restores adapter,
