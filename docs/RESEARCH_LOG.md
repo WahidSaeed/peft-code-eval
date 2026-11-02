@@ -1242,6 +1242,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Assistant's recommendation:** keep the full-method loss for the official runs; fix overfitting with early stopping (E, #85). Report the 14.5% figure in the thesis (it explains why validation loss is a blunt signal here) and name edit-focused training (masking, RepairLLaMA-style outputs) as future work. Reconsider (i) only if GPU budget for one more pilot appears before the official runs.
 - ❓ Nothing decided.
 
+### 87. Outreach about the overfitting: drafts for the RepairLLaMA authors and two forums ⏳
+- **User's request (2026-11-02):** ask on a forum and reach out to someone who had a similar issue.
+- **Search first (web, 2026-11-02):** no thread found with the same situation (code repair, copy-heavy targets, validation loss rising after epoch 1 regardless of data size). General sources describe the same pattern in LoRA fine-tuning: validation loss rising while accuracy barely drops, tracked to overconfidence (LoRA-ensembles paper, arXiv 2402.12264), with early stopping and fewer epochs as the usual remedies. The RepairLLaMA repository shows no issue about validation loss; the paper motivates LoRA by the overfitting risk of full fine-tuning on limited APR data.
+- **Who is closest:** the RepairLLaMA authors (same dataset, LoRA, Java APR; we reproduced their released results exactly, #73).
+- **Drafts written** (the user posts them): (A) a GitHub issue on the RepairLLaMA repository (how they chose epochs and checkpoints, whether their chunk-only output was meant to avoid copy-dominated loss, whether rising validation loss went with worse repair rates); (B) a Hugging Face Forums post (overconfidence vs real loss of ability; early stopping vs fixed epochs in a comparative study; experience with masking unchanged lines); (C) a short Reddit r/LocalLLaMA version. Pilot numbers only, labelled as such, no private details (#74). The drafts are kept outside this repository.
+- ⏳ Waiting for the user to post them. Decisions #85 and #86 remain open, and answers may inform them, but the official runs don't depend on a reply.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
