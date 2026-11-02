@@ -18,7 +18,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | `src/profiler.py` | ✅ (untested on GPU) | Compiles; needs GPU for a real test |
 | `src/metrics_se.py` | ✅ | Sanity-checked on ground truth |
 | `src/trainer.py` | ✅ (CPU smoke test) | GPU paths validated by the dry run (#25) |
-| `src/evaluator.py` | ✅ (CPU smoke test) | Greedy (Megadiff) / n = 20 sampling (test-based) + greedy batch-1 latency probe (#26, #39) |
+| `src/evaluator.py` | ✅ (CPU smoke test) | Greedy (Megadiff) / n = 20 sampling (test-based) + greedy batch-1 latency probe (#26, #39); HumanEval-Java budget 1,024 tokens (#93) |
 | `scripts/run_matrix.sh`, `scripts/evaluate_all.sh` | ✅ | Tested in a bash 5 container (#26) |
 | `src/execution.py` (pass@1, pass@10) | ✅ | HumanEvalFix-Java + HumanEval-Java: clean sets canonical 100 % / buggy 0 % (#39); other HEF languages validated in #22 |
 | GPU dry run | ✅ | Modal A10/A10G: all bit-widths fit 24 GB; ~170–200 GPU-h total (#46) |
@@ -26,7 +26,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
 | Phase 0: reproduce Tier-A papers | ✅ | Li et al. reproduced on HumanEval-Java (#63); RepairLLaMA DeepSeek-LoRA reproduced exactly, 91/134 (#73); Huang and Wei not reproduced, with reasons (#64) |
-| Pass@k in RQ1 | ✅ | pass@1 primary + pass@10 secondary, n = 20, T = 0.2 (#37, #39) |
+| Pass@k in RQ1 | ✅ | pass@1 primary (n = 20, T = 0.2); pass@10 secondary from a second n = 20 at T = 0.8 (#37, #39, #93) |
 | Training data | ✅ | Megadiff replaces CodeXGLUE (#34–#39) |
 | Citation verification (DOIs) | ❓ | User's paper list must be verified |
 | Novelty check + positioning table | ✅ | No prior bit-width × rank study for APR found (#29) |
@@ -612,7 +612,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Jiang et al. and Li et al. gave no description, so our HumanEval-Java numbers are **not directly comparable** with theirs.
 - **Checks:**
   - Megadiff splits are **byte-identical** after the rebuild (md5); the contamination check still uses the method only.
-  - HumanEval-Java prompts now average 475 tokens (max 1,122), up from 347.
+  - HumanEval-Java prompts now average 475 tokens (max 1,122), up from 347. ⚠️ Corrected in #93: with the DeepSeek tokenizer and chat template, the prompts with descriptions average 347 tokens (max 774).
   - Harness sanity re-run: reference fixes pass 100%, buggy code 0% on the clean set.
 - **Still open:** item 3 of #39 (→ decided in #42) and item 4 (GPU dry run, blocked on the AWS quota, see #41).
 
@@ -1391,9 +1391,9 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Cost:** evaluation roughly doubles for each cell whose best epoch isn't 3 (in both pilots it was epoch 1); training cost is unchanged.
 - **Superseded:** "final checkpoint primary" (#77, #83). Open decisions 18, 19 and 21 are closed; #88 is resolved without an expert. The outreach drafts (#87) are no longer needed for the decision; posting them is optional.
 - **Expectation from the pilots:** M2 would select epoch 1 (validation loss 0.0831 vs 0.0864 and 0.1045). Pilot adapters weren't saved per epoch (the trainer change came later), so the epoch-1 M2 numbers will come from the official run.
-- **Still open:** Q2 (pass@10 temperature), Q3 (HumanEval-Java description format), and the unclosed-fence scoring rule (#90, open to the user's veto).
+- **Still open:** Q2 (pass@10 temperature), Q3 (HumanEval-Java description format), and the unclosed-fence scoring rule (#90, open to the user's veto). → Q2/Q3 decided in #93.
 
-### 92. Discussion: Q2 (pass@10 temperature) and Q3 (HumanEval-Java descriptions) ❓
+### 92. Discussion: Q2 (pass@10 temperature) and Q3 (HumanEval-Java descriptions) ✅ decided in #93
 - **Q2 evidence:**
   - Chen et al. (Codex paper, PDF p. 5): the best sampling temperature depends on k: T* = 0.2 for pass@1 and T* = 0.8 for pass@100 (679M model), "because the resulting set of samples has higher diversity".
   - Chen et al. §4.5 (p. 8, Fig. 9): the **fine-tuned** Codex-S "prefers slightly higher temperatures for all k > 1", which "possibly reflects the fact that Codex-S captures a narrower distribution than Codex". Our pilots show the same, more strongly. Distinct outputs out of 20 at T = 0.2 (#73, #90):
@@ -1412,10 +1412,37 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **Q2:** keep n = 20 at T = 0.2 for pass@1, unchanged and comparable with the StarCoder2/OctoPack protocol. Add a second n = 20 run at T = 0.8, pre-specified (Chen et al.), used only for pass@10. Report pass@10 at T = 0.2 and the distinct-output count as descriptive diversity measures.
   - **Q3:** keep the descriptions (#40 stands), and fix the token limit so the copied comment can't truncate answers. Optional before the official runs: a no-description HumanEval-Java diagnostic for M0 and the pilot adapter, to measure the format effect.
 
+### 93. Decisions: pass@10 from a second run at T = 0.8; HumanEval-Java keeps its descriptions with a larger token budget; description diagnostic started ✅
+- **User decisions (2026-11-02), on the recommendations in #92:**
+  1. **pass@10 from a separate run at T = 0.8** ✅
+     - pass@1 (primary) stays at n = 20, T = 0.2, unchanged and comparable with the StarCoder2/OctoPack protocol.
+     - pass@10 (secondary) comes from a second n = 20 at T = 0.8 on HumanEvalFix-Java and HumanEval-Java, top-p 0.95, same seed. The temperature is pre-specified from Chen et al., not tuned on the test set.
+     - Applies to every primary result: M0, M1–M9 at the best-validation epoch, and the seed runs. The `_final` adapters (#91) run at T = 0.2 only.
+     - pass@10 at T = 0.2 and the number of distinct outputs per task are still reported, as descriptive measures of sample diversity.
+     - Caveat for the thesis: Chen et al. give T* = 0.8 for pass@100; for k = 10 the optimum lies between 0.2 and 0.8 (their Fig. 5) and no exact value is stated.
+  2. **HumanEval-Java keeps its descriptions** (#40, #53 stand), with a **larger generation budget**: `max_new_tokens` 512 → **1,024**.
+     - Same rule as #39 (longest reference + margin), applied to what a fine-tuned model actually returns: description + fixed method. The longest is **676 tokens** (MIN_PATH), counted with the DeepSeek tokenizer.
+     - ⚠️ **Changed from the 1,280 proposed in #92.** The proposal was based on the "max 1,122 tokens" prompt figure in #40, which is wrong. Re-measured with the DeepSeek tokenizer and chat template, prompts average **347** tokens and the longest is **774**. The #40 figures (mean 475, max 1,122) don't reproduce; the cause is unknown, possibly a different tokenizer.
+     - Memory check for a 16-bit model (10 samples per `generate()` call, #46): the worst case is (774 + 1,024) tokens × 10 sequences × 0.5 MiB KV cache per token ≈ 8.8 GiB. That is about the HumanEvalFix case measured in #46 (19.6 GiB peak), so it fits 24 GB. At 1,280 it would be ≈ 10 GiB, close to the usable limit.
+     - Effect on M0: almost none (6 of 3,260 pilot samples hit 512).
+  3. **Description diagnostic approved** (diagnostic only, never a reported result).
+- **Code:**
+  - `src/evaluator.py`: `MAX_NEW_TOKENS["humaneval_java"] = 1024`.
+  - `--no_description` (HumanEval-Java only) removes the `/* … */` comment. The prompt is then exactly the Megadiff training format (instruction + buggy method), checked on all 163 prompts; the function aborts if any prompt doesn't fit that pattern.
+  - `scripts/evaluate_all.sh`: `evaluate <name> <bits> <primary|secondary>`. Primary results add `<name>_t08` (both test-based benchmarks at T = 0.8, latency probe skipped because it's greedy and identical) and its scores `results/scores/<name>_t08_tests.json`.
+  - Tested in a bash 5.2 container with a stub `python`: M0 and best-epoch adapters get the T = 0.8 run; `M2_final` doesn't; best epoch 3 → no `_final`.
+- **Cost:** pilot timings on an A10: the T = 0.8 run adds ~2.5–3.3 GPU-h per primary model (~40–55 GPU-h for 16 primary results).
+- **Diagnostic** (`scripts/description_diagnostic.sh`, Modal GPU job `fc-01M6F612VQ71V37SKZ2DT5NFZ0`, started 2026-11-02 ~23:30 CET; Modal usage this month before the job: $21.70 of the $30 credit):
+  - `M2_pilotA10_nodesc`: 10k pilot adapter, no description.
+  - `M0_pilotA10_nodesc`: untuned model, no description.
+  - `M2_pilotA10_tok1024`: pilot adapter, with description, 1,024 tokens (checks the truncation fix).
+  - All HumanEval-Java, 20 samples, T = 0.2. Scoring follows in the CPU `score` job.
+  - **How it will be read:** if removing the description helps the fine-tuned model clearly more than M0, the M0-vs-fine-tuned comparison on HumanEval-Java is confounded by the prompt format. A no-description variant is then reported as a secondary result for all models (also comparable with Jiang et al., Li et al. and RepairLLaMA, which gave no description). Otherwise, the diagnostic goes into the threats to validity. That decision is the user's, after the numbers.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
-1. ~~Pass@k~~ → pass@1 primary + pass@10 secondary from n = 20 samples (#37, #39).
+1. ~~Pass@k~~ → pass@1 primary + pass@10 secondary from n = 20 samples (#37, #39); pass@10 from a second run at T = 0.8 (#93).
 2. ~~Multiple seeds~~ → 3 seeds (42/43/44) for M2, M5, M8 (#27).
 3. ~~M0~~ → zero-shot (#27).
 4. ~~Phase 0 reproduction~~ → Li et al. adapter re-run on HumanEval-Java: generation reproduced (146/163 identical top beams); harness agrees within 3 pp on comparable tasks (#63). Retraining not planned.
@@ -1434,4 +1461,6 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 20. Train only on changed lines (loss masking / down-weighting)? Recommended: not for the official runs; future work (#86). ❓
 19. ~~Prevent overfitting~~ → best-validation-epoch selection without early stopping (full 3 epochs kept for the epoch-3 evidence) (#91).
 18. ~~Secondary analysis~~ → reversed: the best-validation epoch is primary, epoch 3 is evaluated as the secondary result when it differs (#91).
+22. ~~pass@10 temperature (Q2)~~ → second n = 20 run at T = 0.8 for primary results (#93).
+23. ~~HumanEval-Java description vs training format (Q3)~~ → keep descriptions, budget 1,024 tokens; no-description diagnostic running; a secondary no-description variant depends on its result (#93). ⏳
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓

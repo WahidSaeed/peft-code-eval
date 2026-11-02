@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Generate predictions for M0–M9 on the Megadiff test split (greedy, scored inline: EM / CodeBLEU / syntax)
-# and on HumanEvalFix-Java + HumanEval-Java (20 samples, T = 0.2), then score the test-based benchmarks
-# (pass@1, pass@10) by running the tests. Run on the GPU VM: execution.py runs model-written code.
+# and on HumanEvalFix-Java + HumanEval-Java (20 samples at T = 0.2 → pass@1; for primary results a second
+# 20 samples at T = 0.8 → pass@10, RESEARCH_LOG #93), then score the test-based benchmarks by running the
+# tests. Run on the GPU VM: execution.py runs model-written code.
 #   bash scripts/evaluate_all.sh            # all ten models
 #   bash scripts/evaluate_all.sh M0 M2      # selected models
 #   bash scripts/evaluate_all.sh M2_s43 M2_s44 M5_s43 M5_s44 M8_s43 M8_s44   # extra-seed adapters
@@ -18,33 +19,46 @@ MODELS=("${@:-M0 M1 M2 M3 M4 M5 M6 M7 M8 M9}")
 MODELS=(${MODELS[@]})
 mkdir -p results/predictions results/scores
 
-evaluate() {  # evaluate <run_name> <bits> [--adapter DIR]
-  local name="$1" bits="$2"; shift 2
+score_tests() {  # score_tests <run_name>: unit tests of both test-based benchmarks → results/scores/<run_name>_tests.json
+  python src/execution.py results/predictions/"$1"_humanevalfix_java.jsonl results/predictions/"$1"_humaneval_java.jsonl \
+    --per_sample_out "results/scores/$1_tests_per_sample.jsonl" > "results/scores/$1_tests.json"
+  cat "results/scores/$1_tests.json"
+}
+
+evaluate() {  # evaluate <run_name> <bits> <primary|secondary> [--adapter DIR]
+  local name="$1" bits="$2" role="$3"; shift 3
   echo "== $name: Megadiff test ($(date -Is))"
   python src/evaluator.py --bits "$bits" "$@" --run_name "$name" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} --benchmark megadiff --score
   for b in humanevalfix humaneval_java; do
-    echo "== $name: $b ($(date -Is))"
+    echo "== $name: $b, T = 0.2 ($(date -Is))"
     python src/evaluator.py --bits "$bits" "$@" --run_name "$name" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} --benchmark "$b"
   done
-  python src/execution.py results/predictions/"${name}"_humanevalfix_java.jsonl results/predictions/"${name}"_humaneval_java.jsonl \
-    --per_sample_out "results/scores/${name}_tests_per_sample.jsonl" > "results/scores/${name}_tests.json"
-  cat "results/scores/${name}_tests.json"
+  score_tests "$name"   # pass@1 (primary metric)
+  # pass@10 from a separate run at T = 0.8 (Chen et al., 2021; RESEARCH_LOG #93), primary results only.
+  # The batch-size-1 latency probe is greedy and identical to the T = 0.2 run, so it is skipped here.
+  [[ "$role" == primary ]] || return 0
+  for b in humanevalfix humaneval_java; do
+    echo "== ${name}_t08: $b, T = 0.8 ($(date -Is))"
+    python src/evaluator.py --bits "$bits" "$@" --run_name "${name}_t08" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} \
+      --benchmark "$b" --temperature 0.8 --latency_samples 0
+  done
+  score_tests "${name}_t08"   # pass@10 (secondary metric)
 }
 
 # Checkpoint selection (RESEARCH_LOG #91): every cell is trained for all 3 epochs. The primary result <m> uses the
 # epoch with the lowest validation loss (results/runs/<m>/best_epoch.json, written by the trainer). If that is not
-# the last epoch, the final adapter is evaluated as well, as <m>_final (secondary result).
+# the last epoch, the final adapter is evaluated as well, as <m>_final (secondary result; T = 0.2 only).
 for m in "${MODELS[@]}"; do
   cell="${m%%_s*}"   # M2_s43 -> M2
-  if [[ "$m" == "M0" ]]; then evaluate M0 "${BITS[$cell]}"; continue; fi
+  if [[ "$m" == "M0" ]]; then evaluate M0 "${BITS[$cell]}" primary; continue; fi
   run="results/runs/$m"
   [[ -d "$run/adapter" && -f "$run/best_epoch.json" ]] || { echo "== $m: no adapter or best_epoch.json, skipping"; continue; }
   best=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['best_epoch'])" "$run/best_epoch.json")
   last=$(python -c "import json,sys; print(max(map(int, json.load(open(sys.argv[1]))['val_loss_per_epoch'])))" "$run/best_epoch.json")
   [[ -d "$run/adapter-epoch$best" ]] || { echo "== $m: adapter-epoch$best missing, skipping"; continue; }
   echo "== $m: best epoch $best of $last (lowest validation loss)"
-  evaluate "$m" "${BITS[$cell]}" --adapter "$run/adapter-epoch$best"
+  evaluate "$m" "${BITS[$cell]}" primary --adapter "$run/adapter-epoch$best"
   if [[ "$best" != "$last" ]]; then
-    evaluate "${m}_final" "${BITS[$cell]}" --adapter "$run/adapter"
+    evaluate "${m}_final" "${BITS[$cell]}" secondary --adapter "$run/adapter"   # T = 0.2 only
   fi
 done

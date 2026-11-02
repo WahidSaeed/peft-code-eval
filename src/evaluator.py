@@ -7,8 +7,8 @@
 
 Decoding (RESEARCH_LOG #37/#39):
   megadiff        greedy, 1 sample: Exact Match / CodeBLEU / syntax on the held-out split
-  humanevalfix,   sampled, n = 20, temperature 0.2, top-p 0.95 (OctoPack protocol):
-  humaneval_java  pass@1 and pass@10 from the same samples, scored by execution.py
+  humanevalfix,   sampled, n = 20, temperature 0.2, top-p 0.95 (OctoPack protocol): pass@1, scored by execution.py
+  humaneval_java  second run, --temperature 0.8 (Chen et al., 2021): pass@10 (RESEARCH_LOG #93)
 
 Two measurement phases, both on the same loaded model:
   1. Batched generation over the whole test set → predictions JSONL, generation
@@ -26,6 +26,7 @@ execution.py on a disposable machine.
 import argparse
 import json
 import math
+import re
 import statistics
 import sys
 import time
@@ -41,8 +42,10 @@ from profiler import GPUProfiler, append_csv, cap_vram, measure_generation  # no
 from trainer import quantization_config  # noqa: E402
 
 # Longest reference fix + margin (DeepSeek tokenizer, RESEARCH_LOG #39):
-# Megadiff test max 375 tokens, HumanEval-Java max 383, HumanEvalFix-Java max 506 (whole class)
-MAX_NEW_TOKENS = {"megadiff": 512, "humaneval_java": 512, "humanevalfix": 768}
+# Megadiff test max 375 tokens, HumanEvalFix-Java max 506 (whole class).
+# HumanEval-Java: fine-tuned models copy the description comment into the answer, so the budget covers the
+# longest description + reference fix, 676 tokens (MIN_PATH), not the method alone (RESEARCH_LOG #92, #93).
+MAX_NEW_TOKENS = {"megadiff": 512, "humaneval_java": 1024, "humanevalfix": 768}
 N_SAMPLES = {"megadiff": 1, "humaneval_java": 20, "humanevalfix": 20}
 
 
@@ -58,6 +61,23 @@ def load_records(benchmark, data_dir, languages, limit=None):
         rows = [json.loads(l) for l in open(path) if l.strip()]
         records += rows[:limit] if limit else rows
     return records
+
+
+_DESCRIPTION = re.compile(r"(Buggy method:\n)/\*.*?\*/\n", re.DOTALL)
+
+
+def strip_descriptions(records, benchmark):
+    """Diagnostic variant (RESEARCH_LOG #93): the HumanEval-Java prompt without the description comment,
+    i.e. the training format (instruction + buggy method). Never used for reported primary results."""
+    if benchmark != "humaneval_java":
+        raise SystemExit("--no_description applies to humaneval_java only")
+    out = []
+    for r in records:
+        prompt, n = _DESCRIPTION.subn(r"\1", r["prompt"], count=1)
+        if n != 1 or not prompt.endswith(r["buggy"]):
+            raise SystemExit(f"{r['id']}: description not found or prompt not 'instruction + buggy method'")
+        out.append({**r, "prompt": prompt, "description_stripped": True})
+    return out
 
 
 def load_model(model_name, bits, adapter=None):
@@ -186,6 +206,8 @@ def parse_args(argv=None):
     p.add_argument("--limit", type=int, help="first N records per file (debugging)")
     p.add_argument("--score", action="store_true", help="score Megadiff inline (EM, CodeBLEU, syntax; first sample)")
     p.add_argument("--seed", type=int, default=42)
+    p.add_argument("--no_description", action="store_true",
+                   help="DIAGNOSTIC ONLY (RESEARCH_LOG #93): drop the description comment from HumanEval-Java prompts")
     p.add_argument("--max_vram_gib", type=float,
                    help="cap PyTorch GPU memory (e.g. 24 on a 48 GB card, to emulate a 24 GB GPU)")
     args = p.parse_args(argv)
@@ -204,6 +226,8 @@ def main(argv=None):
     tokenizer.padding_side = "left"  # decoder-only batched generation
 
     records = load_records(args.benchmark, args.data_dir, args.languages, args.limit)
+    if args.no_description:
+        records = strip_descriptions(records, args.benchmark)
     prompts = [chat_prompt(tokenizer, r["prompt"]) for r in records]
     print(f"{args.run_name}: {len(records)} prompts from {args.benchmark}")
 
