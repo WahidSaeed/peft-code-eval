@@ -1438,6 +1438,11 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - `M0_pilotA10_nodesc`: untuned model, no description.
   - `M2_pilotA10_tok1024`: pilot adapter, with description, 1,024 tokens (checks the truncation fix).
   - All HumanEval-Java, 20 samples, T = 0.2. Scoring follows in the CPU `score` job.
+  - **Run 1 scored** (2026-11-03 ~00:50 CET, CPU job `fc-01M6FA8EAS9CTT9J44PE471NAM`): the pilot adapter **without** descriptions reaches pass@1 **42.2%** / pass@10 47.9%, vs 55.3% / 63.7% with descriptions (512 tokens) and M0's 64.8% / 81.9% with descriptions.
+    - On the 157 tasks not affected by truncation, the description is worth **+15.0 pp** to the fine-tuned model (57.2% vs 42.2%). Per task, 37 are ≥ 50 pp better with the description and 11 are worse.
+    - It helps on both description sources: Java-file 36.2% → 47.0%; HumanEval 49.6% → 69.6%.
+    - Without descriptions the copying problem remains: 194 samples return the buggy method unchanged (236 with descriptions). Distinct outputs: 2.0 of 20.
+    - **Reading so far:** the description doesn't hurt the fine-tuned model; the model uses it. The comparison with M0 needs run 2 (M0 without descriptions).
   - **How it will be read:** if removing the description helps the fine-tuned model clearly more than M0, the M0-vs-fine-tuned comparison on HumanEval-Java is confounded by the prompt format. A no-description variant is then reported as a secondary result for all models (also comparable with Jiang et al., Li et al. and RepairLLaMA, which gave no description). Otherwise, the diagnostic goes into the threats to validity. That decision is the user's, after the numbers.
 
 ---
