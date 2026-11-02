@@ -1393,6 +1393,25 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Expectation from the pilots:** M2 would select epoch 1 (validation loss 0.0831 vs 0.0864 and 0.1045). Pilot adapters weren't saved per epoch (the trainer change came later), so the epoch-1 M2 numbers will come from the official run.
 - **Still open:** Q2 (pass@10 temperature), Q3 (HumanEval-Java description format), and the unclosed-fence scoring rule (#90, open to the user's veto).
 
+### 92. Discussion: Q2 (pass@10 temperature) and Q3 (HumanEval-Java descriptions) ❓
+- **Q2 evidence:**
+  - Chen et al. (Codex paper, PDF p. 5): the best sampling temperature depends on k: T* = 0.2 for pass@1 and T* = 0.8 for pass@100 (679M model), "because the resulting set of samples has higher diversity".
+  - Chen et al. §4.5 (p. 8, Fig. 9): the **fine-tuned** Codex-S "prefers slightly higher temperatures for all k > 1", which "possibly reflects the fact that Codex-S captures a narrower distribution than Codex". Our pilots show the same, more strongly. Distinct outputs out of 20 at T = 0.2 (#73, #90):
+    - HumanEvalFix-Java: M0 12.1, fine-tuned 1.5–1.6.
+    - HumanEval-Java: M0 17.7, fine-tuned 1.8–2.1.
+  - At T = 0.2 the fine-tuned models' pass@10 is therefore close to their pass@1. A pass@10 comparison at one low temperature favours the model with the broader distribution (M0).
+  - Pilot sampling time on an A10, per model: HumanEvalFix-Java 1.1–1.7 h, HumanEval-Java 1.4–1.7 h.
+- **Q3 evidence (10k pilot M2 vs M0, HumanEval-Java, 3,260 samples each; offline analysis of the saved outputs):**
+  - **Token-limit artefact:** M2 copies the description comment into 3,147 answers (M0: 5). On tasks with long descriptions, the copy uses up the 512-token budget, which was sized from the longest *method* (383 tokens, #39). Result: 121 incomplete outputs, all compile errors (M0: 1). Nearly all samples are affected in 6 tasks: MIN_PATH, MOVE_ONE_BALL and VALID_DATE 20/20, BY_LENGTH 19/20, CORRECT_BRACKETING 16/20, NUMERICAL_LETTER_GRADE 15/20. The limit penalises only the models that copy the comment, i.e. the fine-tuned ones.
+  - **Drop by description source** (mean per-task change in pass rate, M2 − M0):
+    - Descriptions from the Java file (90 tasks): −15.1 pp; 24 tasks ≥ 50 pp worse, 7 tasks better.
+    - Descriptions from HumanEval (73 tasks): −2.5 pp; 11 tasks worse, 8 better.
+    - The two task sets differ in more than the description, so this is a hint, not a measured format effect.
+  - **Buggy method returned unchanged** (comments ignored): M2 236 samples in 20 tasks, 4 of them in all 20 samples; M0 49 samples. This is consistent with the copy-heavy training data (#76), not with the prompt.
+- ❓ Assistant's recommendations, nothing decided:
+  - **Q2:** keep n = 20 at T = 0.2 for pass@1, unchanged and comparable with the StarCoder2/OctoPack protocol. Add a second n = 20 run at T = 0.8, pre-specified (Chen et al.), used only for pass@10. Report pass@10 at T = 0.2 and the distinct-output count as descriptive diversity measures.
+  - **Q3:** keep the descriptions (#40 stands), and fix the token limit so the copied comment can't truncate answers. Optional before the official runs: a no-description HumanEval-Java diagnostic for M0 and the pilot adapter, to measure the format effect.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
