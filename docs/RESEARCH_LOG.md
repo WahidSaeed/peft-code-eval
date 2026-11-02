@@ -1160,7 +1160,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 
 ## 2026-11-02
 
-### 81. 18k-pair M2 pilot started on Modal 🔄
+### 81. 18k-pair M2 pilot started on Modal ✅ (results: #90)
 - **User decision (2026-11-01): "yes, start the 18k M2 pilot"** (as planned in #77 and #80).
 - **Pre-flight:** all six local data files match the SHA-256 values in `splits/README.md` (training set 18,106 pairs). Recipe unchanged from the 10k pilot (#73): M2 = 4-bit NF4, r = 16, seed 42, 3 epochs, effective batch 16 → **3,396 optimizer steps** (10k pilot: 1,875), checkpoints every 200 steps, validation loss after each epoch. Evaluation on Megadiff (greedy), HumanEvalFix-Java and HumanEval-Java (n = 20, T = 0.2), the same as the 10k pilot so the two runs can be compared.
 - **Fix found before the launch:** `scripts/pilot_cell.sh` always named its run `<cell>_pilotA10`, the folder the 10k pilot already used, so the script would have found that adapter, skipped training and re-used the old outputs. The script now takes an optional tag (`bash scripts/pilot_cell.sh M2 pilotA10_18k`); the default keeps the old name.
@@ -1275,7 +1275,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 
 - Wei et al. (#15), Vallecillos-Ruiz et al. (#12) and Kusama et al. (#17) study quantized models at inference time without fine-tuning, so the question doesn't arise; OctoPack, WaveCoder and FLAMES were not checked.
 - **Findings:**
-  1. **We are not the only ones: Macháček et al. saw the same pattern** (validation loss flat or rising by epoch 3 with LoRA on APR data) and Li et al. saw LoRA get worse with more epochs. Li et al. also found that more training data helped little (measured with (IA)³, not LoRA), consistent with our 10k vs 18k pilots (#81).
+  1. **We are not the only ones: Macháček et al. saw a similar pattern** (with LoRA the validation loss stagnates after epoch 1; it rises by epoch 3 only with full fine-tuning; corrected after the PDF check below) and Li et al. saw LoRA get worse with more epochs. Li et al. also found that more training data helped little (measured with (IA)³, not LoRA), consistent with our 10k vs 18k pilots (#81).
   2. **No cited paper knowingly evaluates an overfit model.** They avoid it in one of two ways: **one epoch** (Jiang et al., chosen on validation data; Huang et al. and Lee et al. for large models), or **train longer and select a checkpoint on validation data** (Weyssow et al.: lowest evaluation loss; Macháček et al.: 3 epochs, epoch 1 used; Huang et al.: validation-based selection study). The validation-based selection is exactly option E (#85), with Q1 and CORE A/A* precedents.
   3. **Only Li et al. tuned the epoch count on benchmark results.** That is the weaker practice our design avoids (#82).
   4. **"Train only on the changes" (#86) is standard in APR, but always with the bug location given:** Jiang et al. (patched lines), RepairLLaMA (OR2 chunk), Huang et al. (CR3: fault location in the input, fix without surrounding code is best). None of them masks the copied lines while keeping whole-function output; our format (no fault localization, whole method out) is the setting where copy-heavy targets arise.
@@ -1345,6 +1345,29 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **RepairLLaMA, confirmed:** p. 6 (learning rate 5e-4 with cosine decay, 2 epochs, batch 16 per GPU, LoRA r = 8, α = 16, dropout 0.05, q_proj/v_proj); p. 5 (LoRA "acts as a regularizer … helping prevent overfitting"); p. 10 ("Possibly, the fully fine-tuned models suffer from overfitting due to the limited fine-tuning data").
   - **Lee et al., confirmed (first PDF check, not only #78):** p. 4 (Recoder/CLM data: 129,300 fine-tuning, 14,366 evaluation, the same split as Jiang et al.); p. 6 (r = 64, α = 16, dropout 0.1; "fine-tuned for one epoch"); pp. 5/10 (each model trained five times, average of the middle three).
   - **QLoRA, confirmed:** p. 8 ("we finetune only on the response"); p. 22 (validation split "to perform more rigorous hyperparameter tuning and early stopping", Super-Natural Instructions); p. 24 (Table 10: training on the target only scores higher on MMLU than training on source and target).
+
+
+### 90. 18k pilot scored; fix for an unclosed code fence in the output ✅
+- **Scoring (2026-11-02):** unit tests for the 18k M2 pilot (#81) in Modal's CPU `score` job (generated code doesn't run locally), with the same command as the 10k pilot.
+- **First result looked broken:** HumanEvalFix-Java pass@1 12.6%, with 2,620 of 3,280 samples failing to compile; 2,564 of these were `illegal character: '`'`.
+- **Cause:** in 2,564 samples (78%) the 18k model opens a Markdown fence (```` ```java ````) and then stops right after the code without closing it. `extract_code` only removed **closed** fences, so the backticks reached the compiler. The 10k model and M0 never opened a fence on HumanEvalFix. On HumanEval-Java and Megadiff the 18k model didn't do this either.
+- **Fix (commit 2434c64):** `extract_code` in `src/execution.py` and `src/metrics_se.py` also accepts a fence that is opened but never closed (the code runs to the end of the output). Checked offline on every pilot prediction file (string processing only): **only the 2,564 18k HumanEvalFix samples change**; all M0 and 10k outputs, the 18k HumanEval-Java outputs and all Megadiff outputs are byte-for-byte unchanged, so their earlier scores stand. Modal app redeployed (this also ships the per-epoch adapter saving from #83). The strict scores are kept as `results/pilot/M2_pilotA10_18k_strict_tests*.json` on the volume.
+- ⚠️ **Methodology note (open to the user's veto):** this scores "opened but never closed" as code rather than as a formatting failure. Reason: the code inside is complete (it ends with the class's closing brace), and the study measures repair ability, not Markdown formatting. Both numbers are kept. The same rule applies to every later run.
+- **Results (pass@1 / pass@10 from n = 20 at T = 0.2; Megadiff greedy):**
+
+| Model | HumanEvalFix-Java | HumanEval-Java | Megadiff EM / CodeBLEU |
+|---|---|---|---|
+| M0 (no fine-tuning) | 53.1 / 72.0 | 64.8 / 81.9 | 3.1% / 0.741 |
+| M2, 10k pairs | 57.5 / 63.1 | 55.3 / 63.7 | 8.8% / 0.860 |
+| M2, 18k pairs (fence fix) | **50.0 / 56.6** | **58.2 / 65.7** | 9.2% / 0.859 |
+| M2, 18k pairs (strict) | 12.6 / 22.6 | 58.2 / 65.7 | — |
+
+- **Reading (one run each, no seeds yet, so these are indications only):**
+  1. **More data didn't help in a consistent direction.** HumanEvalFix fell 7.5 points (57.5 → 50.0); HumanEval-Java rose 2.9 (55.3 → 58.2); Megadiff barely moved (EM 8.8 → 9.2). This fits the identical validation curves (#81) and Li et al.'s data-size finding (#89).
+  2. **Both pilots are still below M0** on HumanEval-Java and on pass@10 for both benchmarks. Combined with the rising validation loss, this is consistent with the epoch-3 adapters being over-trained (#84, #88).
+  3. **Sample diversity is still collapsed:** distinct outputs per task out of 20 average 1.48 (18k) vs 1.58 (10k) on HumanEvalFix and 1.83 vs 2.10 on HumanEval-Java; about two thirds of HumanEvalFix tasks have only one distinct output.
+  4. **Fenced outputs passed less often** (47.8% vs 57.8% for plain outputs), but this is confounded by task (56 of 164 tasks mix both), so it's no evidence that the fence itself matters.
+- **Input for the expert discussion (#88).** No decision taken.
 
 ---
 
