@@ -1258,6 +1258,30 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Not affected:** the 18k pilot's evaluation continues (#81); its benchmark scores are input for the expert discussion. The trainer fixes (#81 data cache, #83 per-epoch adapters) are needed whichever option is chosen.
 - ⏳ Waiting for the expert discussion.
 
+### 89. How the cited fine-tuning papers handle overfitting, epochs and checkpoint selection ✅ (literature check)
+- **User's question (2026-11-02):** did our cited papers face this overfitting, and if not, what do they do? Input for the expert discussion (#88).
+- **Method:** local PDFs (Li et al., Huang et al.: full text searched) and arXiv HTML versions (RepairLLaMA, Macháček et al., Jiang et al., Weyssow et al., QLoRA: passages extracted with a web tool). ⚠️ Passages from the web tool are summaries with quotes; verify them against the PDFs before quoting them in the thesis. Lee et al. from our earlier full reading (#78).
+
+| Paper (ref #) | Training | Overfitting / validation | How the model is chosen |
+|---|---|---|---|
+| Macháček et al., ICSME 2025 (#16) | LoRA r = 8 / IA3; 1 epoch in RQ1, 3 epochs in RQ2–RQ3 | Validation loss "stagnates at high values or even increases at epoch 3"; full fine-tuning overfits more; PEFT "reducing overfitting"; abstract: fine-tuning lowered repair results "due to different data distributions and overfitting" | **Trained 3 epochs, then used the epoch-1 models** for LoRA and IA3 ("we chose the first epoch of each model") |
+| Weyssow et al., TOSEM 2025 (#14) | LoRA/IA3/QLoRA, LR 3e-4, up to 5 epochs, evaluated every 0.2 epoch | QLoRA discussed as mitigating overfitting | **Checkpoint with the lowest evaluation loss** used for inference |
+| Jiang et al., ICSE 2023 (#2) | Full fine-tuning, LR 1e-5, 1 epoch | Validation set (14,366) used "to tune the hyper-parameters (e.g., number of training epochs)"; models "converge fast on the validation dataset" | **1 epoch, chosen on validation data.** Output: only the patched lines |
+| Huang et al., TSE 2025 (#13) | Small models: full fine-tuning, 30 epochs; 6B+ models: 8-bit QLoRA, **1 epoch** ("based on the experience of previous work", i.e. Jiang et al.) | Explicit **checkpoint-selection study**: best-perplexity vs best-BLEU vs last checkpoint on the validation set; best metric depends on the scenario (perplexity generalises better when test data differ from training data); ensemble of checkpoints recommended | Validation-based selection (small models); 1 epoch (large models). Best representation: **fault location in the input, only the fix as output** ("fix code without surrounding tokens") |
+| Li et al., ASE 2024 (#6) | LoRA r = 32, α = 16, LR 1e-4, 5 epochs | Full fine-tuning overfit ("overfitting issues with only 5 epochs"; reducing to 3 not enough). For LoRA, **8 epochs fixed fewer bugs than 5**; a larger instruction set gave little gain (halving the data cost only 3.67% of fixes, Finding 8) | 5 epochs, apparently chosen from **benchmark results** (their Table 6), not a validation split |
+| RepairLLaMA, TSE 2025 (#1) | LoRA r = 8, q/v; LR 5e-4, cosine; **2 epochs** | Overfitting named only for full fine-tuning ("limited fine-tuning data"); no validation loss, checkpoint selection or early stopping mentioned | Fixed 2 epochs. Output: **only the fixed chunk** (OR2), shorter than the whole function; requires the bug location in the input |
+| Lee et al., IST 2026 (#11) | QLoRA r = 64, dropout 0.1; Recoder data (129,300 pairs); **1 epoch**; 5 runs per model | Not recorded in our reading (#78) | Fixed 1 epoch |
+| QLoRA, NeurIPS 2023 (#8) | Instruction tuning; trains on response tokens only where possible | Uses a validation split for "hyperparameter tuning and early stopping" (Super-Natural Instructions experiments) | Validation-based where a split exists |
+
+- Wei et al. (#15), Vallecillos-Ruiz et al. (#12) and Kusama et al. (#17) study quantized models at inference time without fine-tuning, so the question doesn't arise; OctoPack, WaveCoder and FLAMES were not checked.
+- **Findings:**
+  1. **We are not the only ones: Macháček et al. saw the same pattern** (validation loss flat or rising by epoch 3 with LoRA on APR data) and Li et al. saw LoRA get worse with more epochs. Li et al. also found that more training data helped little, consistent with our 10k vs 18k pilots (#81).
+  2. **No cited paper knowingly evaluates an overfit model.** They avoid it in one of two ways: **one epoch** (Jiang et al., chosen on validation data; Huang et al. and Lee et al. for large models), or **train longer and select a checkpoint on validation data** (Weyssow et al.: lowest evaluation loss; Macháček et al.: 3 epochs, epoch 1 used; Huang et al.: validation-based selection study). The validation-based selection is exactly option E (#85), with Q1 and CORE A/A* precedents.
+  3. **Only Li et al. tuned the epoch count on benchmark results.** That is the weaker practice our design avoids (#82).
+  4. **"Train only on the changes" (#86) is standard in APR, but always with the bug location given:** Jiang et al. (patched lines), RepairLLaMA (OR2 chunk), Huang et al. (CR3: fault location in the input, fix without surrounding code is best). None of them masks the copied lines while keeping whole-function output; our format (no fault localization, whole method out) is the setting where copy-heavy targets arise.
+  5. **For the reviewer concern (#83):** "trained for 3 epochs, evaluated the epoch with the lowest validation loss" is the protocol of Macháček et al. and Weyssow et al., so it reads as standard practice, not as an incomplete study.
+- No decision; input for the expert discussion (#88).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
