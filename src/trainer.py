@@ -61,8 +61,8 @@ FIXED = {
 
 class EpochAdapterSaver(TrainerCallback):
     """Saves the LoRA adapter at the end of every epoch to <output_dir>/adapter-epoch<N>/ (RESEARCH_LOG #83).
-    The final adapter/ stays the primary result; the per-epoch copies allow a later secondary evaluation of
-    earlier epochs without retraining. Adapter weights only (no optimizer state), so the cost is storage."""
+    The epoch with the lowest validation loss is the primary result (best_epoch.json, #91); the final adapter/
+    is the secondary one. Adapter weights only (no optimizer state), so the cost is storage."""
 
     def __init__(self, out_dir, tokenizer):
         self.out_dir, self.tokenizer = Path(out_dir), tokenizer
@@ -268,6 +268,14 @@ def main(argv=None):
 
     history = trainer.state.log_history
     eval_losses = [h["eval_loss"] for h in history if "eval_loss" in h]
+    # Checkpoint selection (RESEARCH_LOG #91): the primary model is the epoch with the lowest validation loss
+    # (all epochs are trained; adapter-epoch<N>/ holds each one). Test benchmarks never enter this choice (#82).
+    per_epoch = {round(h["epoch"]): h["eval_loss"] for h in history if "eval_loss" in h and args.max_steps <= 0}
+    best_epoch = min(per_epoch, key=per_epoch.get) if per_epoch else None
+    if best_epoch is not None:
+        (out / "best_epoch.json").write_text(json.dumps(
+            {"best_epoch": best_epoch, "criterion": "lowest validation loss",
+             "val_loss_per_epoch": {str(k): round(v, 4) for k, v in sorted(per_epoch.items())}}, indent=2))
     eval_runtime_s = sum(h.get("eval_runtime", 0.0) for h in history)
     p = prof.results
     row = {
@@ -299,6 +307,7 @@ def main(argv=None):
         "energy_method": p.get("energy_method"),
         "final_train_loss": round(train_output.training_loss, 4),
         "eval_loss_per_eval": json.dumps([round(x, 4) for x in eval_losses]),
+        "best_epoch": best_epoch,
         "gpu_name": p.get("gpu_name"),
         "vram_cap_gib": args.max_vram_gib if vram_fraction else None,
         "resumed_from": Path(resume).name if resume else "",

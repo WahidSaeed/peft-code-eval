@@ -18,20 +18,33 @@ MODELS=("${@:-M0 M1 M2 M3 M4 M5 M6 M7 M8 M9}")
 MODELS=(${MODELS[@]})
 mkdir -p results/predictions results/scores
 
+evaluate() {  # evaluate <run_name> <bits> [--adapter DIR]
+  local name="$1" bits="$2"; shift 2
+  echo "== $name: Megadiff test ($(date -Is))"
+  python src/evaluator.py --bits "$bits" "$@" --run_name "$name" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} --benchmark megadiff --score
+  for b in humanevalfix humaneval_java; do
+    echo "== $name: $b ($(date -Is))"
+    python src/evaluator.py --bits "$bits" "$@" --run_name "$name" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} --benchmark "$b"
+  done
+  python src/execution.py results/predictions/"${name}"_humanevalfix_java.jsonl results/predictions/"${name}"_humaneval_java.jsonl \
+    --per_sample_out "results/scores/${name}_tests_per_sample.jsonl" > "results/scores/${name}_tests.json"
+  cat "results/scores/${name}_tests.json"
+}
+
+# Checkpoint selection (RESEARCH_LOG #91): every cell is trained for all 3 epochs. The primary result <m> uses the
+# epoch with the lowest validation loss (results/runs/<m>/best_epoch.json, written by the trainer). If that is not
+# the last epoch, the final adapter is evaluated as well, as <m>_final (secondary result).
 for m in "${MODELS[@]}"; do
   cell="${m%%_s*}"   # M2_s43 -> M2
-  adapter=()
-  if [[ "$m" != "M0" ]]; then
-    adapter=(--adapter "results/runs/$m/adapter")
-    [[ -d "results/runs/$m/adapter" ]] || { echo "== $m: no adapter, skipping"; continue; }
+  if [[ "$m" == "M0" ]]; then evaluate M0 "${BITS[$cell]}"; continue; fi
+  run="results/runs/$m"
+  [[ -d "$run/adapter" && -f "$run/best_epoch.json" ]] || { echo "== $m: no adapter or best_epoch.json, skipping"; continue; }
+  best=$(python -c "import json,sys; print(json.load(open(sys.argv[1]))['best_epoch'])" "$run/best_epoch.json")
+  last=$(python -c "import json,sys; print(max(map(int, json.load(open(sys.argv[1]))['val_loss_per_epoch'])))" "$run/best_epoch.json")
+  [[ -d "$run/adapter-epoch$best" ]] || { echo "== $m: adapter-epoch$best missing, skipping"; continue; }
+  echo "== $m: best epoch $best of $last (lowest validation loss)"
+  evaluate "$m" "${BITS[$cell]}" --adapter "$run/adapter-epoch$best"
+  if [[ "$best" != "$last" ]]; then
+    evaluate "${m}_final" "${BITS[$cell]}" --adapter "$run/adapter"
   fi
-  echo "== $m: Megadiff test ($(date -Is))"
-  python src/evaluator.py --bits "${BITS[$cell]}" "${adapter[@]}" --run_name "$m" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} --benchmark megadiff --score
-  for b in humanevalfix humaneval_java; do
-    echo "== $m: $b ($(date -Is))"
-    python src/evaluator.py --bits "${BITS[$cell]}" "${adapter[@]}" --run_name "$m" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} --benchmark "$b"
-  done
-  python src/execution.py results/predictions/"${m}"_humanevalfix_java.jsonl results/predictions/"${m}"_humaneval_java.jsonl \
-    --per_sample_out "results/scores/${m}_tests_per_sample.jsonl" > "results/scores/${m}_tests.json"
-  cat "results/scores/${m}_tests.json"
 done

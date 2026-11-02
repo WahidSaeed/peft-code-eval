@@ -33,7 +33,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
 | Learning path | ✅ | `docs/LEARNING_PATH.md` |
 | RunPod fallback (RTX 4090, $0.90/h) | 📋 backlog | Only if AWS denies the appeal (#23) |
-| Training recipe for the official runs (overfitting) | ⏳ | On hold until an expert has been consulted (#88); options in #83–#86 |
+| Training recipe for the official runs (overfitting) | ✅ | 3 epochs, primary = epoch with the lowest validation loss, epoch 3 secondary (#91) |
 | Megadiff token cap 1,024 (~25.7k training pairs) | 📋 backlog | Counted only; revisit after the 18k M2 pilot (#79) |
 | Public GitHub repo | ✅ | https://github.com/WahidSaeed/peft-code-eval (#18) |
 
@@ -1250,7 +1250,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Drafts written** (the user posts them; one Markdown file per platform with a link to the post form, title pre-filled, and a README to track post links and replies): (A) a GitHub issue on the RepairLLaMA repository (how they chose epochs and checkpoints, whether their chunk-only output was meant to avoid copy-dominated loss, whether rising validation loss went with worse repair rates); (B) a Hugging Face Forums post (overconfidence vs real loss of ability; early stopping vs fixed epochs in a comparative study; experience with masking unchanged lines); (C) a short Reddit r/LocalLLaMA version. Pilot numbers only, labelled as such, no private details (#74). The drafts are kept outside this repository.
 - ⏳ Waiting for the user to post them. Decisions #85 and #86 remain open, and answers may inform them, but the official runs don't depend on a reply.
 
-### 88. Decision: consult an expert before choosing how to handle the overfitting ⏳
+### 88. Decision: consult an expert before choosing how to handle the overfitting ✅ (resolved by the literature, #91)
 - **User decision (2026-11-02):** discuss the overfitting with an expert before moving on. The open question is broader than early stopping (#85) or masking (#86): **use the overfit models as they are, change the dataset, or change something else** (recipe, training objective).
 - **What this puts on hold:** the training recipe for the official runs, so the official campaign doesn't start until this is settled. #85 (early stopping) and #86 (edit-only training) stay open as options to put to the expert, together with A (keep the overfit 3-epoch models and report the overfitting, #83/#84) and a dataset change (#77 advised against it, reasons there).
 - **Who:** the supervisor is the natural expert to ask first; outreach (#87: RepairLLaMA authors, Hugging Face Forums, Reddit) may add outside views.
@@ -1373,6 +1373,26 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   4. **Fenced outputs passed less often** (47.8% vs 57.8% for plain outputs), but this is confounded by task (56 of 164 tasks mix both), so it's no evidence that the fence itself matters.
 - **Input for the expert discussion (#88).** No decision taken.
 
+
+### 91. Decision: train 3 epochs, evaluate the epoch with the lowest validation loss ✅
+- **User (2026-11-02):** "so then no need to ask for expert, we will follow paper's standards." The literature (#89) replaces the expert consultation planned in #88.
+- **Details chosen by the user (2026-11-02):**
+  - **Epochs:** train all 3 epochs; no early stopping. The primary model is the epoch with the lowest validation loss; epoch 3 is reported as well. This is Macháček et al.'s protocol, and it keeps the epoch-3 evidence for the reviewer question (#83).
+  - **Candidates:** validation loss at the end of each epoch (3 candidates per cell), as Macháček et al. do. Not every 0.2 epoch (Weyssow et al.).
+- **Precedents (#89, checked against the PDFs):** Weyssow et al. (TOSEM 2025, lowest evaluation loss), Wang & Shen (IST 2027, APR with DeepSeek-Coder and QLoRA, lowest validation perplexity), Macháček et al. (ICSME 2025, 3 epochs then epoch 1), Huang et al. (TSE 2025, validation-based selection); early stopping on validation: Liu et al. (TSE 2026).
+- **Rules:**
+  - The choice uses only the Megadiff validation split (1,000 pairs); the test benchmarks never enter it (#82).
+  - Each cell (and each seed run) picks its own best epoch; the chosen epoch is reported per cell.
+  - Ties: lowest epoch (`min` on the dict keeps the first).
+- **Code (2026-11-02):**
+  - `src/trainer.py` writes `results/runs/<run>/best_epoch.json` (best epoch, criterion, validation loss per epoch) and a `best_epoch` column in the training log.
+  - `scripts/evaluate_all.sh` evaluates `adapter-epoch<best>` as `<run>` (primary). If the best epoch isn't the last, it also evaluates the final adapter as `<run>_final` (secondary).
+  - Tested on fake runs in a bash 5.2 container with a stub `python`: best epoch 1 → primary epoch 1 plus `_final`; best epoch 3 → evaluated once; runs without an adapter or `best_epoch.json` are skipped.
+- **Cost:** evaluation roughly doubles for each cell whose best epoch isn't 3 (in both pilots it was epoch 1); training cost is unchanged.
+- **Superseded:** "final checkpoint primary" (#77, #83). Open decisions 18, 19 and 21 are closed; #88 is resolved without an expert. The outreach drafts (#87) are no longer needed for the decision; posting them is optional.
+- **Expectation from the pilots:** M2 would select epoch 1 (validation loss 0.0831 vs 0.0864 and 0.1045). Pilot adapters weren't saved per epoch (the trainer change came later), so the epoch-1 M2 numbers will come from the official run.
+- **Still open:** Q2 (pass@10 temperature), Q3 (HumanEval-Java description format), and the unclosed-fence scoring rule (#90, open to the user's veto).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1390,9 +1410,9 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
-17. ~~1 epoch vs 3 epochs~~ → keep 3 epochs, final checkpoint primary, adapters saved at every epoch (#83).
-21. **How to handle the overfitting (overfit models as they are / early stopping / dataset change / objective change): to be discussed with an expert first; official runs on hold (#88).** ⏳
+17. ~~1 epoch vs 3 epochs~~ → keep 3 epochs, adapters saved at every epoch (#83); primary checkpoint changed to the lowest-validation-loss epoch (#91).
+21. ~~How to handle the overfitting~~ → no expert consultation needed; follow the cited papers' standard: train 3 epochs, evaluate the epoch with the lowest validation loss (#91).
 20. Train only on changed lines (loss masking / down-weighting)? Recommended: not for the official runs; future work (#86). ❓
-19. Prevent overfitting: early stopping on validation loss with a 3-epoch maximum (E, recommended) vs lower LR / more regularization (needs a pilot) (#85). ❓
-18. Secondary analysis: evaluate every model's epoch-1 adapter alongside the primary epoch-3 results? (#84) ❓
+19. ~~Prevent overfitting~~ → best-validation-epoch selection without early stopping (full 3 epochs kept for the epoch-3 evidence) (#91).
+18. ~~Secondary analysis~~ → reversed: the best-validation epoch is primary, epoch 3 is evaluated as the secondary result when it differs (#91).
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
