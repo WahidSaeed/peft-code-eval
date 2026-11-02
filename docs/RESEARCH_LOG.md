@@ -1296,7 +1296,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Research tools tried (2026-11-02, user: "yes use all"):**
   - **OpenAlex API** (free, no login): collected every paper citing Weyssow, Huang, Macháček, Li, RepairLLaMA and Lee (Jiang left out: several hundred citations, older). 151 unique citing papers, ranked by keywords in title and abstract: `thesis/literature/2026-11-02_openalex_citing_papers.md` (script next to it). OpenAlex's counts are lower than ResearchRabbit's (Macháček 6 vs 13, Li 14 vs 33), so the list is not complete.
   - **Semantic Scholar API:** the keyless tier returned HTTP 429 (rate limited) for both the citation lists and the passage search. It needs a free API key, which the user would request (form at semanticscholar.org/product/api). ⏳ The user requested a key on 2026-11-02; the request was received and is in a backlog, with no date given. Once the key arrives: passage search for epochs, checkpoint selection and validation loss in APR/PEFT papers, plus the full citation lists (OpenAlex's are incomplete).
-  - **scite.ai:** citation statements need a paid plan or trial ($12/month); the free page lists 5 papers citing Macháček, none about training overfitting.
+  - **scite.ai:** citation statements need a paid plan or trial ($12/month); the free page lists 5 papers citing Macháček, none about training overfitting. (Dropped later at the user's request.)
   - **Elicit:** the user is not logged in. **Zotero:** not installed. Both are left for the user to decide.
 - **New leads from OpenAlex (abstracts read; full texts not yet):**
   - **Afrin, Haque, Mastropaolo, PEFT SLR: published in ACM TOSEM 2026, https://doi.org/10.1145/3796522.** It now meets the citation rule; it was removed earlier as a preprint (references.md).
@@ -1304,6 +1304,18 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **Wang et al., Pattern Synergistic Repair: Multi-expert LoRA fusion for APR**, IST 2026, https://doi.org/10.1016/j.infsof.2026.108344 (no abstract indexed).
   - **An Empirical Study of Parameter-Efficient Fine-Tuning in Code Change Learning and Beyond**, IEEE TSE 2025, https://doi.org/10.1109/tse.2025.3637335 (LoRA vs full fine-tuning on code-change tasks; catastrophic forgetting).
   - No abstract among the 151 says that validation loss rose or that epochs were chosen on validation data. That would only show in full texts, which is what the Semantic Scholar passage search would cover.
+- **More tools (2026-11-02, later; user: ignore scite.ai, Consensus API key provided, Elicit logged in):**
+  - **scite.ai:** dropped, at the user's request.
+  - **Consensus API** (`GET https://api.consensus.app/v1/search`, `x-api-key` header, 20 results per question): 8 questions (overfitting with LoRA for APR, number of epochs, validation loss rising after epoch 1, checkpoint selection, early stopping with PEFT, loss on edited tokens only, epochs vs output diversity, bit-width with LoRA). Results: `thesis/literature/2026-11-02_consensus_results.md`; script `consensus_search.py` reads the key from the `CONSENSUS_API_KEY` environment variable (the key is not stored in any file).
+  - **Peer-reviewed leads from Consensus (abstracts only, not yet read):**
+    - MORepair: *Teaching LLMs to Repair Code via Multi-Objective Fine-Tuning*, ACM TOSEM, https://doi.org/10.1145/3735129 (LLM fine-tuning for repair).
+    - *Experimental Evaluation of Parameter-Efficient Fine-Tuning for Software Engineering Tasks*, ACM TOSEM 2025, https://doi.org/10.1145/3722107.
+    - *Repeatability of Fine-Tuning Large Language Models Illustrated Using QLoRA*, IEEE Access 2024, https://doi.org/10.1109/access.2024.3470850 (QLoRA results not repeatable across runs; relevant to our 3 seeds, #27).
+    - *Early Detection and Reduction of Memorization for Domain Adaptation and Instruction Tuning*, TACL 2025, https://doi.org/10.1162/tacl.a.49 (memorisation appears early in fine-tuning; relevant to early stopping, #85).
+    - FGit: *Fault-Guided Fine-Tuning for Code Generation*, ASE 2025, https://doi.org/10.1109/ase63991.2025.00114 (weights error-sensitive code segments in the loss; relevant to edit-focused training, #86).
+    - *LoRA Learns Less and Forgets Less*, TMLR 2024 (LoRA vs full fine-tuning on code; TMLR isn't CORE- or SJR-ranked, so check it against the citation rule).
+  - **Elicit** ("Find papers", free plan; the 7-day Pro trial offer, which would charge after the trial, was declined): returned 3 papers (Yang & Lo *Hotfixing*, Haider et al. QLoRA code review, Macháček et al.). **⚠️ Elicit misattributed evidence:** its row for Yang & Lo repeated Macháček's findings (3 epochs, stagnation after epoch 1, first-epoch adapters used). The Yang & Lo arXiv full text says something else: CodeGen-350M trained for 5 epochs and CodeGen-2B for 3; LoRA, IA3, prefix tuning and QLoRA (8- and 4-bit); an 8:1:1 split, with no statement of how validation data is used, no mention of overfitting and no checkpoint-selection rule. Lesson: Elicit's extracted cells must be checked against the paper before use. Haider et al. (arXiv): QLoRA, mostly 2 epochs; no checkpoint rule reported.
+  - **Zotero:** the user asked whether to install the Mac app or the Connector. Recommended: the Zotero 7 Mac app first (library, PDFs, BibTeX via Better BibTeX), then the Connector browser extension for saving papers in one click. Not installed yet.
 
 ---
 
