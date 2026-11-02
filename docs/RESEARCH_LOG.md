@@ -1324,6 +1324,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     - MORepair's title is duplicated in the subtitle.
   - Better BibTeX installed by the user (2026-11-02).
   - **Elicit dropped** (user, 2026-11-02): too expensive, and the Zotero connection needs a paid plan.
+  - **PDFs (Zotero "Find Full Text", 2026-11-02):** 30 of 37 items got a PDF. Missing: Lee et al. (IST, closed), Huang et al. (TSE, closed; our local copy is in `_session_backup_2026-10-22/scratchpad/papers/huang.pdf`), the Zenodo replication package (code, no PDF expected); among the leads, Wang et al. Pattern Synergistic Repair (IST, closed), the TSE 2025 code-change PEFT study (closed), the TACL 2025 memorisation paper (open access at MIT Press) and the IST 2026 LoRA comparison (open access per OpenAlex; SSRN preprint 10.2139/ssrn.5896253). Closed ones: through the university library.
 
 ---
 
