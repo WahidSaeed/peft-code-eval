@@ -1425,6 +1425,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
      - ⚠️ **Changed from the 1,280 proposed in #92.** The proposal was based on the "max 1,122 tokens" prompt figure in #40, which is wrong. Re-measured with the DeepSeek tokenizer and chat template, prompts average **347** tokens and the longest is **774**. The #40 figures (mean 475, max 1,122) don't reproduce; the cause is unknown, possibly a different tokenizer.
      - Memory check for a 16-bit model (10 samples per `generate()` call, #46): the worst case is (774 + 1,024) tokens × 10 sequences × 0.5 MiB KV cache per token ≈ 8.8 GiB. That is about the HumanEvalFix case measured in #46 (19.6 GiB peak), so it fits 24 GB. At 1,280 it would be ≈ 10 GiB, close to the usable limit.
      - Effect on M0: almost none (6 of 3,260 pilot samples hit 512).
+     - ✅ **User confirmed 1,024 (2026-11-02), replacing the 1,280 proposed in #92.**
   3. **Description diagnostic approved** (diagnostic only, never a reported result).
 - **Code:**
   - `src/evaluator.py`: `MAX_NEW_TOKENS["humaneval_java"] = 1024`.
