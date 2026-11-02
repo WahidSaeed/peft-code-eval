@@ -33,6 +33,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
 | Learning path | ✅ | `docs/LEARNING_PATH.md` |
 | RunPod fallback (RTX 4090, $0.90/h) | 📋 backlog | Only if AWS denies the appeal (#23) |
+| Training recipe for the official runs (overfitting) | ⏳ | On hold until an expert has been consulted (#88); options in #83–#86 |
 | Megadiff token cap 1,024 (~25.7k training pairs) | 📋 backlog | Counted only; revisit after the 18k M2 pilot (#79) |
 | Public GitHub repo | ✅ | https://github.com/WahidSaeed/peft-code-eval (#18) |
 
@@ -1246,8 +1247,16 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **User's request (2026-11-02):** ask on a forum and reach out to someone who had a similar issue.
 - **Search first (web, 2026-11-02):** no thread found with the same situation (code repair, copy-heavy targets, validation loss rising after epoch 1 regardless of data size). General sources describe the same pattern in LoRA fine-tuning: validation loss rising while accuracy barely drops, tracked to overconfidence (LoRA-ensembles paper, arXiv 2402.12264), with early stopping and fewer epochs as the usual remedies. The RepairLLaMA repository shows no issue about validation loss; the paper motivates LoRA by the overfitting risk of full fine-tuning on limited APR data.
 - **Who is closest:** the RepairLLaMA authors (same dataset, LoRA, Java APR; we reproduced their released results exactly, #73).
-- **Drafts written** (the user posts them): (A) a GitHub issue on the RepairLLaMA repository (how they chose epochs and checkpoints, whether their chunk-only output was meant to avoid copy-dominated loss, whether rising validation loss went with worse repair rates); (B) a Hugging Face Forums post (overconfidence vs real loss of ability; early stopping vs fixed epochs in a comparative study; experience with masking unchanged lines); (C) a short Reddit r/LocalLLaMA version. Pilot numbers only, labelled as such, no private details (#74). The drafts are kept outside this repository.
+- **Drafts written** (the user posts them; one Markdown file per platform with a link to the post form, title pre-filled, and a README to track post links and replies): (A) a GitHub issue on the RepairLLaMA repository (how they chose epochs and checkpoints, whether their chunk-only output was meant to avoid copy-dominated loss, whether rising validation loss went with worse repair rates); (B) a Hugging Face Forums post (overconfidence vs real loss of ability; early stopping vs fixed epochs in a comparative study; experience with masking unchanged lines); (C) a short Reddit r/LocalLLaMA version. Pilot numbers only, labelled as such, no private details (#74). The drafts are kept outside this repository.
 - ⏳ Waiting for the user to post them. Decisions #85 and #86 remain open, and answers may inform them, but the official runs don't depend on a reply.
+
+### 88. Decision: consult an expert before choosing how to handle the overfitting ⏳
+- **User decision (2026-11-02):** discuss the overfitting with an expert before moving on. The open question is broader than early stopping (#85) or masking (#86): **use the overfit models as they are, change the dataset, or change something else** (recipe, training objective).
+- **What this puts on hold:** the training recipe for the official runs, so the official campaign doesn't start until this is settled. #85 (early stopping) and #86 (edit-only training) stay open as options to put to the expert, together with A (keep the overfit 3-epoch models and report the overfitting, #83/#84) and a dataset change (#77 advised against it, reasons there).
+- **Who:** the supervisor is the natural expert to ask first; outreach (#87: RepairLLaMA authors, Hugging Face Forums, Reddit) may add outside views.
+- ⚠️ **Schedule risk (flagged, no change proposed):** the deadline is 2026-11-25; the campaign needs about 180–280 GPU-h depending on the option (7–12 days on one GPU), and there is still no GPU platform (#80). Every day of waiting comes out of the margin for running, analysis and writing.
+- **Not affected:** the 18k pilot's evaluation continues (#81); its benchmark scores are input for the expert discussion. The trainer fixes (#81 data cache, #83 per-epoch adapters) are needed whichever option is chosen.
+- ⏳ Waiting for the expert discussion.
 
 ---
 
@@ -1267,6 +1276,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
 17. ~~1 epoch vs 3 epochs~~ → keep 3 epochs, final checkpoint primary, adapters saved at every epoch (#83).
+21. **How to handle the overfitting (overfit models as they are / early stopping / dataset change / objective change): to be discussed with an expert first; official runs on hold (#88).** ⏳
 20. Train only on changed lines (loss masking / down-weighting)? Recommended: not for the official runs; future work (#86). ❓
 19. Prevent overfitting: early stopping on validation loss with a 3-epoch maximum (E, recommended) vs lower LR / more regularization (needs a pilot) (#85). ❓
 18. Secondary analysis: evaluate every model's epoch-1 adapter alongside the primary epoch-3 results? (#84) ❓
