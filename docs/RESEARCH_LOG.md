@@ -1175,6 +1175,19 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Expected:** at ~15–16 s per step, training takes **~14–15 h**, plus ~2–3 h of generation; cost about $20–23 of the $30 credit. The $0 spend limit means the job stops if the credit runs out; it would resume from its last checkpoint once credit is available again.
 - **Afterwards:** unit tests in the CPU `score` job, then a comparison with the 10k pilot (validation-loss curve, Megadiff EM/CodeBLEU, pass@1/pass@10).
 
+### 82. Discussion: what to do if the 18k pilot looks like the 10k pilot ❓
+- **User's question (2026-11-02):** if the 18k results end up the same as the 10k pilot, what should we do?
+- **First, what "the same" means:** validation loss rises again in epoch 3 and pass@1 on HumanEvalFix-Java and HumanEval-Java is within a few points of the 10k pilot. If so, more data didn't fix the overfitting, and the remedy has to come from the recipe instead.
+- ⚠️ **Constraint on how the choice is made:** HumanEvalFix-Java and HumanEval-Java are the study's test benchmarks. Changing the recipe because of the pilots' pass@k on them would be tuning on the test set. Any change has to be justified by the **Megadiff validation loss**, which is what a validation split is for. The pilots' pass@k can be reported, but it can't drive the decision.
+- **Options (assistant's assessment):**
+  - **A. Keep the recipe (3 epochs, final checkpoint, 18k).** Already decided (#77) and fully defensible: the research questions compare configurations trained identically, and the overfitting is reported as a measured threat to validity. Costs: all nine models are evaluated in an overfit state, which makes the results less general; and the campaign stays at ~250–280 GPU-h, about 11 days of continuous GPU time, with 23 days left and no GPU platform yet.
+  - **B. Train every model for 1 epoch on 18k (assistant's recommendation).** In both pilots validation loss is lowest after epoch 1, so the epoch count is chosen on validation data with one rule for all nine models (keeping the user's objection to per-model checkpoint selection, #77). Training cost drops to about a third: campaign roughly **~120–150 GPU-h** (A10-speed estimate, not measured). Costs: it changes the plan's fixed 3 epochs (part of #3), so it is a documented deviation and the supervisor should be told. The evidence comes from one cell (M2), though one rule for all cells is still a fair comparison. And a 1-epoch run decays the learning rate over 1 epoch (cosine), so it is not identical to the epoch-1 point of a 3-epoch run; its validation loss is expected to be similar or lower, but that isn't measured.
+  - **C. Middle ground: 2 epochs** (RepairLLaMA's choice). Partly reduces overfitting, ~195–225 GPU-h. Weaker justification: our validation loss already rises at epoch 2.
+  - **D. Lower learning rate or more LoRA dropout.** Also recipe changes, but chosen without any validation evidence, so they would need another pilot. Not recommended given the time left.
+  - **Not options:** changing rank (a study factor), a different dataset (#77), or per-model checkpoint selection (#77).
+- **Possible check for B:** a 1-epoch 18k M2 pilot (~4.6 h training + ~2.5 h generation, roughly $8). It may not fit in what is left of November's credit after this pilot (~$7–10), and if the credit runs out, the $0 spend limit stops the job.
+- ❓ **Nothing decided.** Revisit when the 18k pilot finishes (epoch-3 validation loss, pass@k).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1192,4 +1205,5 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
+17. If the 18k pilot overfits like the 10k pilot: keep 3 epochs (A) or train every model for 1 epoch (B, recommended) (#82). ❓
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
