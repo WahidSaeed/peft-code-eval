@@ -1325,6 +1325,15 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Better BibTeX installed by the user (2026-11-02).
   - **Elicit dropped** (user, 2026-11-02): too expensive, and the Zotero connection needs a paid plan.
   - **PDFs (Zotero "Find Full Text", 2026-11-02):** 30 of 37 items got a PDF. Missing: Lee et al. (IST, closed), Huang et al. (TSE, closed; our local copy is in `_session_backup_2026-10-22/scratchpad/papers/huang.pdf`), the Zenodo replication package (code, no PDF expected); among the leads, Wang et al. Pattern Synergistic Repair (IST, closed), the TSE 2025 code-change PEFT study (closed), the TACL 2025 memorisation paper (open access at MIT Press) and the IST 2026 LoRA comparison (open access per OpenAlex; SSRN preprint 10.2139/ssrn.5896253). Closed ones: through the university library.
+  - **PDFs downloaded but not yet attached in Zotero (2026-11-02 evening):** Lee et al. and the SSRN preprint of the IST 2026 LoRA comparison are in Downloads; Zotero still showed no PDF for them, so they need to be dragged onto the items.
+- **Semantic Scholar API key approved (2026-11-02).** Used per command only (not stored in any file); 1 request/s.
+  - **Passage search** (`/graph/v1/snippet/search`, 8 queries x 20 passages): `thesis/literature/2026-11-02_s2_passages.md`. Most hits were general LoRA papers outside code. Relevant ones:
+    - **RepairLLaMA** (RQ2 results): "Possibly, the fully fine-tuned models suffer from overfitting" (full fine-tuning only; consistent with #89).
+    - **Li et al.**: "we have shown epoch affects the fixing capability of larger scale LLMs" (CodeLlama-13B, p-tuning/prefix-tuning).
+    - ***LoRA Learns Less and Forgets Less*** (TMLR 2024), Appendix F "Solution Generation Diversity": pass@k as k grows, for Llama-2-7B trained 4 epochs on Magicoder. **Directly relevant to our sample-diversity collapse (#73, #84).**
+    - **T5APR** (checkpoint ensemble for APR): an APR precedent for combining checkpoints (cf. Huang et al., Finding 4); venue not yet checked.
+    - No passage found that reports validation loss rising after epoch 1 with LoRA on APR besides Macháček et al.
+  - **Citing papers** (Weyssow 115, Huang 31, Macháček 8, Li 22, RepairLLaMA 132, Lee 0): 281 unique, 170 not in the OpenAlex list. New peer-reviewed leads: **MergeRepair** (merging task-specific LoRA adapters for APR) is now in *Empirical Software Engineering* 2026 (Q1), https://doi.org/10.1007/s10664-026-10943-y; *Exploring the Capabilities of LLMs for Code-Change-Related Tasks*, ACM TOSEM, https://doi.org/10.1145/3709358; *A Comprehensive Evaluation of PEFT on Code Smell Detection*, ACM TOSEM, https://doi.org/10.1145/3806390. Scripts: `thesis/literature/s2_passage_search.py`, `s2_citing_papers.py` (key read from `S2_API_KEY`).
 
 ---
 
