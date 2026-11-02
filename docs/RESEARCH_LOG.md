@@ -1229,6 +1229,19 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Relation to earlier decisions:** E keeps "3 epochs" as the schedule and the maximum, keeps the per-epoch adapters (#83), and replaces "final checkpoint" (#77) with "best-validation checkpoint". This reverses part of #77, so it needs the user's explicit confirmation.
 - ❓ Awaiting the user's choice.
 
+### 86. Discussion: train only on the changed lines? ❓
+- **User's question (2026-11-02):** why train on data that doesn't change anything? Discuss training only on changed lines.
+- **Measurement** (`analysis/feasibility/megadiff_edit_share.py`, new, CPU, 18,106 training pairs; line diff between buggy input and fixed target, DeepSeek tokenizer): only **14.5%** (median) of the target tokens the loss is computed on sit on changed lines (p10 4.9%, p90 45.6%; pooled 18.1%). The median pair changes **1** line of the target. **431 pairs (2.4%) are pure deletions:** their target has no changed line at all.
+- **Why the copied tokens are in the loss today:** the task is "buggy method in, whole fixed method out", and the standard causal-LM loss covers every target token. The copied tokens are not useless: they teach the output format (return a complete, compilable method and stop). The 10k pilot shows that effect: HumanEvalFix-Java compile errors fell from 47 to 4 after fine-tuning (#73). But ~85% of the training signal is "copy this line", which the base model can already do.
+- **Three ways to "train only on the changes" (assistant's assessment):**
+  - **(i) Loss masking or down-weighting, same format.** Input and output stay exactly as now (whole method); only the labels change: tokens on unchanged lines are masked (weight 0) or down-weighted (e.g. 0.1). **Prompts, generation, benchmarks, evaluation, the M0 baseline and both reproductions are unchanged;** only `tokenize_for_training` changes (line diff → per-token weights). The only one of the three that fits the time left.
+  - **(ii) Output only the fixed lines at a marked location** (RepairLLaMA's best representation: the buggy lines are marked or replaced by a fill-in-the-middle hole; the model outputs only the fixed chunk). Requires knowing **where the bug is**: RepairLLaMA assumes perfect fault localization. That changes the task (and makes it easier), so the M0 baseline, the prompts, the evaluator (rebuilding the method from the chunk), both benchmarks and the comparison with Li et al. (#63) would all have to be redone. Not feasible in 23 days.
+  - **(iii) Output a diff** (unified diff or search/replace blocks). No location needed, but models often produce diffs that don't apply; new harness and failure modes. Not feasible now.
+- ⚠️ **Masking is not an overfitting fix by itself.** The overfitting is the memorisation of the *edits* of the training examples (#76): train loss falls while validation loss on the edits rises. Masking removes the easy copy tokens but leaves the gradient on the edit tokens; with the loss averaged over fewer tokens, each edit token gets *more* weight, which could make memorisation faster, not slower. What masking can plausibly change is *what* is learned: less pressure to copy confidently, perhaps less sample-diversity collapse, and a validation loss that measures the edits directly. All unverified.
+- **Further risks of (i):** fully masking drops the format learning (compile errors could return); the 431 pure deletions would train only on EOS; down-weighting adds a weight chosen without evidence. Any change needs a pilot before the official runs, and the remaining Modal credit (~$9 after today's pilot) can't pay for a 3-epoch run (~$20).
+- **Assistant's recommendation:** keep the full-method loss for the official runs; fix overfitting with early stopping (E, #85). Report the 14.5% figure in the thesis (it explains why validation loss is a blunt signal here) and name edit-focused training (masking, RepairLLaMA-style outputs) as future work. Reconsider (i) only if GPU budget for one more pilot appears before the official runs.
+- ❓ Nothing decided.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1247,6 +1260,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
 17. ~~1 epoch vs 3 epochs~~ → keep 3 epochs, final checkpoint primary, adapters saved at every epoch (#83).
+20. Train only on changed lines (loss masking / down-weighting)? Recommended: not for the official runs; future work (#86). ❓
 19. Prevent overfitting: early stopping on validation loss with a 3-epoch maximum (E, recommended) vs lower LR / more regularization (needs a pilot) (#85). ❓
 18. Secondary analysis: evaluate every model's epoch-1 adapter alongside the primary epoch-3 results? (#84) ❓
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
