@@ -1283,6 +1283,16 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - No decision; input for the expert discussion (#88).
 - **Correction (2026-11-02, checked against the local PDF):** Li et al.'s data-size result (Finding 8, Table 9, p. 10) is for (IA)³, not LoRA. Their LoRA finding is the epoch one (p. 8: more epochs "results in a decrease in the fixing capability for LoRA"). Page numbers for Li et al. and Huang et al. are PDF page numbers of our local copies.
 - **ResearchRabbit citation search (2026-11-02):** keyword search returned mostly papers we already cite. Citing papers checked: Macháček et al. (13 citing papers, none on fine-tuning recipes or overfitting) and Li et al. (33 citing papers). Leads to read, none yet confirmed to discuss epochs or overfitting: Wang et al. 2026, *Pattern Synergistic Repair: Multi-expert LoRA fusion for automated program repair* (IST, Q1; no abstract indexed, DOI not yet found); Afrin, Haque, Mastropaolo, *A Systematic Literature Review of Parameter-Efficient Fine-Tuning for Large Code Models* (ResearchRabbit lists it as ACM TOSEM 2025, but no TOSEM DOI found, arXiv:2504.21569; earlier removed as a preprint, see references.md); Yang & Lo, *Hotfixing LLMs for Code: How Far Can PEFT Go?* (arXiv:2408.05727, no peer-reviewed venue found, so it doesn't meet the citation rule). Weyssow et al. and Huang et al. citing papers not yet checked.
+- **Reading guide given to the user (2026-11-02), where each passage is** (full references in `thesis/references.md`; page numbers checked only for Li and Huang, in our local PDFs; for the others, search for the phrase and confirm it in the PDF):
+  - Macháček et al. (#16): abstract ("different data distributions and overfitting"); RQ2/RQ3 setup and results ("stagnates", "increases at epoch 3", "we chose the first epoch of each model").
+  - Li et al. (#6): p. 7 (full fine-tuning overfits at 5 epochs, 3 not enough); p. 8 (more epochs lowers LoRA's fixes; "5 epochs may be sufficient"); p. 10 (Finding 8, data size, (IA)³).
+  - Weyssow et al. (#14): experimental setup ("lowest evaluation loss"; up to 5 epochs, evaluated every 0.2 epoch).
+  - Huang et al. (#13): p. 2 (contributions: fault location + fix without surrounding tokens; checkpoint metrics); p. 5 (PPL/BLEU/Last selection); p. 8 (one epoch for 6B+ models); p. 10 (Finding 4, ensemble).
+  - Jiang et al. (#2): fine-tuning setup ("number of training epochs", "converge fast").
+  - Lee et al. (#11): training settings (QLoRA, 1 epoch, 5 runs); not rechecked.
+  - RepairLLaMA (#1): training details (r = 8, LR 5e-4, 2 epochs) and code-representation section (OR2).
+  - QLoRA (#8): "early stopping" (Super-Natural Instructions) and the appendix on training on the response only.
+- **Suggested ResearchRabbit workflow for the user:** a collection with the 8 core papers above, then Similar and Cited By on the whole collection, sorted by most recent. Browser automation can only read the results list page by page, not the citation graph.
 
 ---
 
