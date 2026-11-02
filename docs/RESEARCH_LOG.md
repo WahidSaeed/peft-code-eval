@@ -1293,6 +1293,17 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - RepairLLaMA (#1): training details (r = 8, LR 5e-4, 2 epochs) and code-representation section (OR2).
   - QLoRA (#8): "early stopping" (Super-Natural Instructions) and the appendix on training on the response only.
 - **Suggested ResearchRabbit workflow for the user:** a collection with the 8 core papers above, then Similar and Cited By on the whole collection, sorted by most recent. Browser automation can only read the results list page by page, not the citation graph.
+- **Research tools tried (2026-11-02, user: "yes use all"):**
+  - **OpenAlex API** (free, no login): collected every paper citing Weyssow, Huang, Macháček, Li, RepairLLaMA and Lee (Jiang left out: several hundred citations, older). 151 unique citing papers, ranked by keywords in title and abstract: `thesis/literature/2026-11-02_openalex_citing_papers.md` (script next to it). OpenAlex's counts are lower than ResearchRabbit's (Macháček 6 vs 13, Li 14 vs 33), so the list is not complete.
+  - **Semantic Scholar API:** the keyless tier returned HTTP 429 (rate limited) for both the citation lists and the passage search. It needs a free API key, which the user would request (form at semanticscholar.org/product/api).
+  - **scite.ai:** citation statements need a paid plan or trial ($12/month); the free page lists 5 papers citing Macháček, none about training overfitting.
+  - **Elicit:** the user is not logged in. **Zotero:** not installed. Both are left for the user to decide.
+- **New leads from OpenAlex (abstracts read; full texts not yet):**
+  - **Afrin, Haque, Mastropaolo, PEFT SLR: published in ACM TOSEM 2026, https://doi.org/10.1145/3796522.** It now meets the citation rule; it was removed earlier as a preprint (references.md).
+  - **A comparative analysis of the role of Large Language Models and Low-Rank Adaptation in Automated Program Repair**, IST 2026 (Q1), https://doi.org/10.1016/j.infsof.2026.108238. LoRA on single-function Java bugs, evaluated on HumanEval-Java and Defects4J: close to our setup, so its training settings are worth checking. Its "overfitting" means patches that overfit weak test suites, not training overfitting.
+  - **Wang et al., Pattern Synergistic Repair: Multi-expert LoRA fusion for APR**, IST 2026, https://doi.org/10.1016/j.infsof.2026.108344 (no abstract indexed).
+  - **An Empirical Study of Parameter-Efficient Fine-Tuning in Code Change Learning and Beyond**, IEEE TSE 2025, https://doi.org/10.1109/tse.2025.3637335 (LoRA vs full fine-tuning on code-change tasks; catastrophic forgetting).
+  - No abstract among the 151 says that validation loss rose or that epochs were chosen on validation data. That would only show in full texts, which is what the Semantic Scholar passage search would cover.
 
 ---
 
