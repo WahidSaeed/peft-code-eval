@@ -80,11 +80,14 @@ DEFECTIVE_TASKS = {
 # Run after the parallel pool, one at a time: Nashorn start-up + JUnit's 3 s timeout fail under load (#38)
 SERIAL_TASKS = {"HumanEval-Java/DO_ALGEBRA"}
 _FENCE = re.compile(r"```[\w+#-]*[ \t]*\n(.*?)```", re.DOTALL)
+_OPEN_FENCE = re.compile(r"^\s*```[\w+#-]*[ \t]*\n(.*)$", re.DOTALL)  # opened, never closed
 
 
 def extract_code(text):
-    """First fenced code block if the model produced one, else the raw text."""
-    m = _FENCE.search(text)
+    """First fenced code block if the model produced one, else the raw text.
+    A fence that is opened but never closed (the model stops right after the code) counts as a code block
+    running to the end of the output: the 18k-pair pilot did this in 78% of HumanEvalFix samples (RESEARCH_LOG #90)."""
+    m = _FENCE.search(text) or _OPEN_FENCE.match(text)
     return (m.group(1) if m else text).strip()
 
 

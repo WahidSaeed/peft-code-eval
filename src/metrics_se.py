@@ -22,10 +22,11 @@ _parser = Parser(JAVA)
 WRAPPER_OPEN = "class __Wrapper__ {\n"
 WRAPPER_CLOSE = "\n}"
 _FENCE = re.compile(r"```[\w+#-]*[ \t]*\n(.*?)```", re.DOTALL)  # any language tag
+_OPEN_FENCE = re.compile(r"^\s*```[\w+#-]*[ \t]*\n(.*)$", re.DOTALL)  # opened, never closed (RESEARCH_LOG #90)
 
 def extract_code(text):
-    """Strip a markdown code fence if the model produced one."""
-    m = _FENCE.search(text)
+    """Strip a markdown code fence if the model produced one (also one that is opened but never closed)."""
+    m = _FENCE.search(text) or _OPEN_FENCE.match(text)
     return (m.group(1) if m else text).strip()
 
 
