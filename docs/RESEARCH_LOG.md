@@ -1322,7 +1322,8 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     - LoRA, QLoRA, LLM.int8(), CodeXGLUE and OctoPack came in as arXiv journal articles; set Item Type to Conference Paper with the venue from references.md.
     - Northcutt et al. came in as a Report; it should be NeurIPS 2021 D&B.
     - MORepair's title is duplicated in the subtitle.
-    - Better BibTeX not installed yet.
+  - Better BibTeX installed by the user (2026-11-02).
+  - **Elicit dropped** (user, 2026-11-02): too expensive, and the Zotero connection needs a paid plan.
 
 ---
 
