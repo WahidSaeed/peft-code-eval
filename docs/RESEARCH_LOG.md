@@ -1215,6 +1215,20 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Pending evidence today:** the 18k pilot's benchmark scores (versus the 10k pilot) show whether the identical loss curve also means identical repair rates.
 - ❓ Nothing decided; the epoch-1 secondary analysis is the user's call.
 
+### 85. Discussion: the user wants models that don't overfit; how, while keeping 3 epochs ❓
+- **User's position (2026-11-02):** "we have to make models dont overfit." Earlier concern still applies (#83): fewer than 3 epochs would look incomplete to reviewers.
+- **What "not overfit" can mean in practice:** the evaluated model is the one at (or near) the lowest validation loss. With 3 full passes over copy-heavy data at a useful learning rate, no setting can guarantee that validation loss never rises during training; what can be guaranteed is that **the model we evaluate isn't the overfit one**.
+- **Rule for the choice (as in #82):** decided on the Megadiff validation loss only, never on HumanEvalFix-Java/HumanEval-Java scores (those are the test benchmarks).
+- **Options (assistant's assessment):**
+  - **E. Early stopping on validation loss, maximum 3 epochs, patience 1 (recommended).** Every model is scheduled for 3 epochs (same cosine schedule as now); after each epoch its validation loss is checked; if it is worse than the best so far, training stops; the evaluated adapter is the epoch with the lowest validation loss (already saved by #83). One rule for all nine models. Answers the reviewer question directly: each model was trained past its best point and the curve shows it got worse (both pilots: best at epoch 1, worse at epoch 2). If a configuration keeps improving, it trains the full 3 epochs. Expected cost if most models stop after epoch 2: training ~215 → ~145 GPU-h, campaign roughly **~180–210 GPU-h** instead of ~250–280 (A10-speed estimate).
+    - **Against E, the user's earlier objection (#77):** models evaluated after different amounts of training mix the bit-width/rank effect with a training-length effect. Answer: the rule is identical and pre-specified; the selected epoch and the epoch at which each model stopped are reported per configuration (themselves a result: how fast each configuration overfits); RQ3 reports the training cost actually spent. In the pilots every M2 run peaked at epoch 1, so if all nine do the same there is no mismatch at all.
+    - Changes needed: an early-stopping callback in `src/trainer.py` (CPU-tested before use), the plan's §5 (3 epochs → "up to 3 epochs, early stopping on validation loss, patience 1"), the thesis methods text; tell the supervisor.
+  - **F. Lower learning rate (e.g. 2e-4 → 5e-5), still 3 epochs.** Slows learning so the minimum may move later. But it is a guess with no validation evidence; it would need a new pilot (~14 h, ~$20) that the remaining credit can't pay for, and it may still overfit by epoch 3.
+  - **G. More regularization (LoRA dropout 0.05 → 0.1, weight decay).** Same problem as F: unverified, needs a pilot, likely only a small effect.
+  - **H. Train only on the edited part (diff/fill-in-the-middle output, as in RepairLLaMA).** Attacks the copy-heavy cause directly, but changes the task format, prompts and evaluation pipeline with 23 days left. Not recommended now.
+- **Relation to earlier decisions:** E keeps "3 epochs" as the schedule and the maximum, keeps the per-epoch adapters (#83), and replaces "final checkpoint" (#77) with "best-validation checkpoint". This reverses part of #77, so it needs the user's explicit confirmation.
+- ❓ Awaiting the user's choice.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1233,5 +1247,6 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
 17. ~~1 epoch vs 3 epochs~~ → keep 3 epochs, final checkpoint primary, adapters saved at every epoch (#83).
+19. Prevent overfitting: early stopping on validation loss with a 3-epoch maximum (E, recommended) vs lower LR / more regularization (needs a pilot) (#85). ❓
 18. Secondary analysis: evaluate every model's epoch-1 adapter alongside the primary epoch-3 results? (#84) ❓
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
