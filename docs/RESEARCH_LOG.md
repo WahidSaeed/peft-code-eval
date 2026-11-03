@@ -1454,9 +1454,30 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
       - **Wang & Shen (IST 2027), §2.3 and §3.4:** a "unified input format" (Fig. 2, an image; not readable from the text); beam size 10, 10 candidates; 5 epochs (CodeLlama 1); checkpoint by lowest validation perplexity (as in #89).
       - **Patricio et al.** (Zotero copy is the preprint, not the IST version), §3.1–3.2: the prompt has the defective code with an infill marker on the faulty line plus instructions; the iterative pipeline adds failing-test details and a one-shot example. No problem description is mentioned.
     - → None of the closest fine-tuning papers states that it gives a problem description. This is consistent with #40 ("not directly comparable"), and is an argument for a secondary no-description variant if the user wants comparability.
+  - **Runs 2 and 3 scored** (2026-11-03, CPU jobs `fc-01M6GDM7NT9720B5X6PZZB5S6D`, `fc-01M6GDM7WPY3K3JJZ3Q6H6GT37`). HumanEval-Java pass@1 / pass@10 (%), 20 samples at T = 0.2:
+
+| Model, prompt | All 163 tasks | 157 tasks without the 6 truncated ones (pass@1) | Distinct outputs of 20 |
+|---|---|---|---|
+| M0, with description (512 tokens) | 64.8 / 81.9 | 65.0 | 17.7 |
+| M0, without description | 44.1 / 66.1 | 43.9 | 17.3 |
+| Pilot M2, with description, 512 tokens | 55.3 / 63.7 | 57.2 | 2.1 |
+| **Pilot M2, with description, 1,024 tokens** | **57.1 / 65.1** | 57.2 | 2.1 |
+| Pilot M2, without description | 42.2 / 47.9 | 42.2 | 2.0 |
+
+    - **Truncation fix works:** at 1,024 tokens no sample hits the limit (94 at 512), compile errors fall from 287 to 193, and pass@1 rises by 1.8 pp. On the 157 unaffected tasks the score is unchanged (57.2), as expected.
+    - Peak VRAM (generation): M0 16-bit without description 17.9 GiB; pilot M2 4-bit with description at 1,024 tokens 10.9 GiB. A 16-bit fine-tuned model with description at 1,024 wasn't measured; the estimate in decision 2 above says it fits.
+    - **The description helps both models**, M0 more: **+21.0 pp** for M0 and **+15.0 pp** for the fine-tuned pilot (157 tasks). Tasks ≥ 50 pp better with the description: M0 39, pilot 37; worse: M0 7, pilot 11.
+    - **Gap between the fine-tuned pilot and M0:** with descriptions −7.8 pp (57.2 vs 65.0), without −1.7 pp (42.2 vs 43.9). Most of the pilot's HumanEval-Java deficit is therefore about **how much each model gains from the description**: fine-tuning on Megadiff, whose prompts never contain one, seems to weaken the use of a natural-language specification. On the buggy code alone the two are close.
+    - pass@10 without descriptions: M0 66.1 vs pilot 47.9. The pilot's collapsed sampling (2 distinct outputs of 20) still dominates pass@10 at T = 0.2, which supports the T = 0.8 decision.
+    - Pilot only (epoch-3 adapter, A10/A10G mix, one seed): an indication, not a thesis result.
+    - ❓ **Decision for the user:** add a **no-description HumanEval-Java variant** as a secondary result for the official models? Arguments for:
+      - It separates "repairs the bug" from "uses the specification", which is where the M0-vs-fine-tuned difference sits.
+      - It is the format of the closest papers (Lee et al., Patricio et al.; Jiang et al.), so our numbers become comparable with theirs.
+      - Cost: ~1–1.2 A10-h per model at T = 0.2.
+      - Against: one more benchmark variant to report.
   - **How it will be read:** if removing the description helps the fine-tuned model clearly more than M0, the M0-vs-fine-tuned comparison on HumanEval-Java is confounded by the prompt format. A no-description variant is then reported as a secondary result for all models (also comparable with Jiang et al., Li et al. and RepairLLaMA, which gave no description). Otherwise, the diagnostic goes into the threats to validity. That decision is the user's, after the numbers.
 
-### 94. Replies to the Hugging Face forum post about the rising validation loss (#87) 📥
+### 94. Replies to the Hugging Face forum post about the rising validation loss (#87) 📥 (decided in #95)
 - **Posted by the user** on the Hugging Face forum, 2026-11-02 (draft B of #87). By 2026-11-03 ~11:00 CET: 2 replies, 43 views. The thread URL is in the private OPS log.
 - **Reply 1** (2026-11-02):
   1. **Mostly overconfidence.** The loss is averaged over ~85% copied tokens, so a few confidently wrong decision tokens dominate it. This also fits the identical samples at T = 0.2.
@@ -1479,6 +1500,29 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - **Masking / PAFT (3):** PAFT uses the same model and HumanEval-Java, and is the closest evidence for option (i) of #86. ❓ #86 stays open; the user decides whether it remains future work. PAFT should be cited either way (preprint, #70 venue check).
   - **Split (reply 2):** Megadiff has no project field, so a project split isn't possible (#39); the file-path split and its limits are documented there. The test-based benchmarks are separate datasets, filtered for overlap with the training data (#39), so they already play the role of the held-out set. Split and checkpoint rules were fixed before the official runs (#39, #91).
 
+### 95. Decisions: changed/copied validation loss added to the official runs; loss masking stays future work; forum reply drafted ✅
+- **User decisions (2026-11-03), on the proposals in #94:**
+  1. **Add the changed vs copied validation loss to the official runs** ✅ (diagnostic only; training unchanged).
+  2. **Loss masking / down-weighting copied tokens (#86) stays future work** ✅. The official runs keep the full-method loss. PAFT (arXiv 2604.03113) goes into related work and future work (preprint; #70 venue check).
+  3. **Draft a reply to the forum thread** ✅ (`thesis/outreach/2026-11-02_overfitting/2b_huggingface_forum_reply.md`; the user posts it).
+- **Code:**
+  - `src/val_loss_split.py` (new): for every `adapter-epoch<N>` of a run, recomputes the validation loss with the training prompt format and labels, split into changed-line tokens, copied-line tokens and EOS. Lines are classified by the `difflib` line diff of #86; a token belongs to the line of its first character. Output: `<run>/val_loss_split.json`, with the overall token-weighted loss, the trainer-style loss (mean of per-batch means, batch 4) and the trainer's own `eval_loss` for comparison.
+  - `scripts/run_matrix.sh` runs it after each training job (outside the timed section, so RQ3 is unaffected; skipped for dry runs and when the JSON exists). A training run is now skipped if its adapter exists, while the split still runs if it's missing.
+- **Checks:**
+  - Offline (tokenizer only): 18.4% of validation target tokens are on changed lines (pooled; median per pair 14.4%), consistent with the 14.5% of training pairs in #86.
+  - **GPU test on both pilot epoch-3 adapters** (Modal job `fc-01M6GESH92PP296G3BV1CQEC33`, 4-bit, ~4.7 min per adapter, output `results/pilot/val_loss_split_pilots_epoch3.json`): the trainer-style loss **0.1044 (10k) / 0.1045 (18k)** reproduces the trainer's logged epoch-3 validation loss 0.1045 for both. The script is validated.
+- **First result (epoch 3 only; the pilots kept no per-epoch adapters):**
+
+| Pilot | Overall (token-weighted) | Changed tokens (38,274) | Copied tokens (168,417) | EOS (1,000) |
+|---|---|---|---|---|
+| 10k | 0.1017 | **0.518** | 0.0077 | 0.0009 |
+| 18k | 0.1021 | **0.520** | 0.0076 | 0.0007 |
+
+  - **~94% of the validation loss comes from the 18% of tokens on changed lines** (0.518 × 38,274 / 207,691 = 0.095 of 0.102). The copied lines are almost free (0.008 per token).
+  - So the validation loss is effectively the **loss on the edit tokens**. The forum reply's wording ("dominated by a handful of decision tokens") is right; the assumption in #86 that copy tokens dilute the signal is wrong in effect, though right by token count.
+  - Whether the edit-token loss is what rises after epoch 1, and whether the copy-token loss moves at all, will come from the official runs (three epoch adapters per cell). This also means early epochs are selected on edit-token loss in practice, which strengthens the #91 rule.
+- **Forum reply draft:** thanks; what changed (split loss logged, with the 94% figure; pass@10 at T = 0.8; best-validation epoch plus epoch 3 for all, no selection on test benchmarks; masking/PAFT as future work; asks for the DM-SFT link); the split answer for reply 2.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1498,9 +1542,10 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
 17. ~~1 epoch vs 3 epochs~~ → keep 3 epochs, adapters saved at every epoch (#83); primary checkpoint changed to the lowest-validation-loss epoch (#91).
 21. ~~How to handle the overfitting~~ → no expert consultation needed; follow the cited papers' standard: train 3 epochs, evaluate the epoch with the lowest validation loss (#91).
-20. Train only on changed lines (loss masking / down-weighting)? Recommended: not for the official runs; future work (#86). ❓
+20. ~~Train only on changed lines (loss masking / down-weighting)?~~ → future work; PAFT cited (#86, #95).
 19. ~~Prevent overfitting~~ → best-validation-epoch selection without early stopping (full 3 epochs kept for the epoch-3 evidence) (#91).
 18. ~~Secondary analysis~~ → reversed: the best-validation epoch is primary, epoch 3 is evaluated as the secondary result when it differs (#91).
 22. ~~pass@10 temperature (Q2)~~ → second n = 20 run at T = 0.8 for primary results (#93).
-23. ~~HumanEval-Java description vs training format (Q3)~~ → keep descriptions, budget 1,024 tokens; no-description diagnostic running; a secondary no-description variant depends on its result (#93). ⏳
+23. ~~HumanEval-Java description vs training format (Q3)~~ → keep descriptions, budget 1,024 tokens (#93). Diagnostic done: the description is worth +21 pp to M0 and +15 pp to the fine-tuned pilot. Add a no-description variant as a secondary result? ❓
+24. ~~Changed vs copied validation loss~~ → added to the official runs (#95).
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓

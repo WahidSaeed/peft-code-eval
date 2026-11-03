@@ -28,11 +28,19 @@ for cell in "${CELLS[@]}"; do
       out="results/runs/${name}"; extra=()
     fi
     if [[ -f "$out/adapter/adapter_model.safetensors" ]]; then
-      echo "== $name: adapter exists in $out, skipping"; continue
+      echo "== $name: adapter exists in $out, skipping training"
+    else
+      echo "== $name: bits=${BITS[$cell]} rank=${RANK[$cell]} seed=$seed -> $out  ($(date -Is))"
+      mkdir -p "$out"
+      python src/trainer.py --bits "${BITS[$cell]}" --rank "${RANK[$cell]}" --seed "$seed" --run_name "$name" \
+        --output_dir "$out" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} "${extra[@]}" 2>&1 | tee "$out/train.log"
     fi
-    echo "== $name: bits=${BITS[$cell]} rank=${RANK[$cell]} seed=$seed -> $out  ($(date -Is))"
-    mkdir -p "$out"
-    python src/trainer.py --bits "${BITS[$cell]}" --rank "${RANK[$cell]}" --seed "$seed" --run_name "$name" \
-      --output_dir "$out" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} "${extra[@]}" 2>&1 | tee "$out/train.log"
+    # Validation loss on changed vs copied tokens for every epoch adapter (RESEARCH_LOG #95). Diagnostic only;
+    # runs after training (outside the timed section). Skipped for dry runs and when already done.
+    if [[ -z "${DRY_RUN:-}" && ! -f "$out/val_loss_split.json" ]]; then
+      echo "== $name: validation loss split ($(date -Is))"
+      python src/val_loss_split.py --bits "${BITS[$cell]}" --run_dir "$out" \
+        ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} 2>&1 | tee "$out/val_loss_split.log"
+    fi
   done
 done
