@@ -1443,6 +1443,17 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     - It helps on both description sources: Java-file 36.2% → 47.0%; HumanEval 49.6% → 69.6%.
     - Without descriptions the copying problem remains: 194 samples return the buggy method unchanged (236 with descriptions). Distinct outputs: 2.0 of 20.
     - **Reading so far:** the description doesn't hurt the fine-tuned model; the model uses it. The comparison with M0 needs run 2 (M0 without descriptions).
+  - **Literature check on the description question (2026-11-03, ScienceDirect LeapSpace + Zotero PDFs):**
+    - LeapSpace is Elsevier's AI assistant over Scopus abstracts and Elsevier full text. Asked whether a problem description in the prompt helps LLM program repair, it cited prompt-ablation studies saying it does:
+      - Hori et al. (LNCS 2025): specification is one of the helpful semantic inputs.
+      - Liu, Li & Ren (ISCTIS 2026): "code description" is a high-value input on QuixBugs.
+      - Li, Jiang, Sun & Zhang (ICSE 2025, NIER track): adding repair-relevant information increases correct and plausible patches.
+      - It found no with/without-description ablation for fine-tuned models on HumanEval-Java. These are abstract-level claims; the papers haven't been read (venue tiers per #70 still to check).
+    - Asked for the prompt formats in the full texts of the three closest IST papers, it answered that the passages weren't in its retrieved evidence, and didn't make anything up. Checked in the PDFs instead:
+      - **Lee et al. (IST 2026), §3.3:** Jiang et al.'s format (defect lines marked, generation after `// fixed lines:`); 1 epoch; 10 patches per problem. No problem description is mentioned.
+      - **Wang & Shen (IST 2027), §2.3 and §3.4:** a "unified input format" (Fig. 2, an image; not readable from the text); beam size 10, 10 candidates; 5 epochs (CodeLlama 1); checkpoint by lowest validation perplexity (as in #89).
+      - **Patricio et al.** (Zotero copy is the preprint, not the IST version), §3.1–3.2: the prompt has the defective code with an infill marker on the faulty line plus instructions; the iterative pipeline adds failing-test details and a one-shot example. No problem description is mentioned.
+    - → None of the closest fine-tuning papers states that it gives a problem description. This is consistent with #40 ("not directly comparable"), and is an argument for a secondary no-description variant if the user wants comparability.
   - **How it will be read:** if removing the description helps the fine-tuned model clearly more than M0, the M0-vs-fine-tuned comparison on HumanEval-Java is confounded by the prompt format. A no-description variant is then reported as a secondary result for all models (also comparable with Jiang et al., Li et al. and RepairLLaMA, which gave no description). Otherwise, the diagnostic goes into the threats to validity. That decision is the user's, after the numbers.
 
 ---
