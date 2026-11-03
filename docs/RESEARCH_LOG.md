@@ -1243,7 +1243,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Assistant's recommendation:** keep the full-method loss for the official runs; fix overfitting with early stopping (E, #85). Report the 14.5% figure in the thesis (it explains why validation loss is a blunt signal here) and name edit-focused training (masking, RepairLLaMA-style outputs) as future work. Reconsider (i) only if GPU budget for one more pilot appears before the official runs.
 - ❓ Nothing decided.
 
-### 87. Outreach about the overfitting: drafts for the RepairLLaMA authors and two forums ⏳
+### 87. Outreach about the overfitting: drafts for the RepairLLaMA authors and two forums ⏳ (Hugging Face forum posted, replies in #94)
 - **User's request (2026-11-02):** ask on a forum and reach out to someone who had a similar issue.
 - **Search first (web, 2026-11-02):** no thread found with the same situation (code repair, copy-heavy targets, validation loss rising after epoch 1 regardless of data size). General sources describe the same pattern in LoRA fine-tuning: validation loss rising while accuracy barely drops, tracked to overconfidence (LoRA-ensembles paper, arXiv 2402.12264), with early stopping and fewer epochs as the usual remedies. The RepairLLaMA repository shows no issue about validation loss; the paper motivates LoRA by the overfitting risk of full fine-tuning on limited APR data.
 - **Who is closest:** the RepairLLaMA authors (same dataset, LoRA, Java APR; we reproduced their released results exactly, #73).
@@ -1455,6 +1455,29 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
       - **Patricio et al.** (Zotero copy is the preprint, not the IST version), §3.1–3.2: the prompt has the defective code with an infill marker on the faulty line plus instructions; the iterative pipeline adds failing-test details and a one-shot example. No problem description is mentioned.
     - → None of the closest fine-tuning papers states that it gives a problem description. This is consistent with #40 ("not directly comparable"), and is an argument for a secondary no-description variant if the user wants comparability.
   - **How it will be read:** if removing the description helps the fine-tuned model clearly more than M0, the M0-vs-fine-tuned comparison on HumanEval-Java is confounded by the prompt format. A no-description variant is then reported as a secondary result for all models (also comparable with Jiang et al., Li et al. and RepairLLaMA, which gave no description). Otherwise, the diagnostic goes into the threats to validity. That decision is the user's, after the numbers.
+
+### 94. Replies to the Hugging Face forum post about the rising validation loss (#87) 📥
+- **Posted by the user** on the Hugging Face forum, 2026-11-02 (draft B of #87). By 2026-11-03 ~11:00 CET: 2 replies, 43 views. The thread URL is in the private OPS log.
+- **Reply 1** (2026-11-02):
+  1. **Mostly overconfidence.** The loss is averaged over ~85% copied tokens, so a few confidently wrong decision tokens dominate it. This also fits the identical samples at T = 0.2.
+     - Cites **Chen, Raventos, Cheng, Ganguli & Druckmann, "Rethinking Fine-Tuning when Scaling Test-Time Compute: Limiting Confidence Improves Mathematical Reasoning", arXiv 2502.07154 (2025)**. Abstract (checked via the arXiv API): with cross-entropy training, pass@N can *decrease* with longer training because of overconfidence.
+     - Suggested checks: validation loss computed separately for changed vs copied tokens, and test-based pass@1/pass@k for each epoch's checkpoint ("If changed-token loss rises while pass@k holds, it's calibration, not lost ability"). Notes that 0.083 → 0.086 is nearly flat; the real jump is epoch 3.
+  2. **For a configuration study, use the same fixed schedule for all.** Early stopping on validation loss would pick a different epoch per configuration and confound bit-width × rank. Save every epoch, and select and report by test-based metrics. Also suggests an LR below 2e-4.
+  3. **Masking or down-weighting copied lines helps on repair.** Cites **PAFT** (Yang, Cai, Jin & Tian, "PAFT: Preservation Aware Fine-Tuning for Minimal-Edit Program Repair", arXiv 2604.03113, 2026). Abstract checked: token-level preservation signals from aligning buggy and fixed code, full-sequence masking and an edit-difficulty curriculum; pass@1 up to +65.6% over standard SFT on Defects4J and HumanEval-Java; DeepSeek-Coder-6.7B on Defects4J 5.9% → 10.1%.
+     - Also mentions "DM-SFT", a SQL-repair paper that randomly masks unchanged lines (no link; not verified).
+     - Advice: don't zero the copied lines; down-weight them (0.1–0.2) or mask a random fraction, and keep full weight on changed lines plus some context.
+- **Reply 2** (2026-11-03):
+  - Check the split: the same pattern, method or file in both splits in slightly different form can make the validation loss behave oddly. Split by project or issue rather than by row.
+  - Keep a held-out set from unseen projects for the test-based check.
+  - Write down the split rule and the checkpoint rule before the next run.
+- **Assistant's assessment against the current design (nothing changed):**
+  - **Overconfidence (1):** consistent with #84 and the T = 0.8 pass@10 decision (#93). Chen et al. 2025 is a direct citation for "pass@N falls with longer CE training"; it's an arXiv preprint, so it needs the venue check of #70.
+  - **Fixed schedule vs per-cell best epoch (2):** this is the objective raised by the user in #77 and answered in #91. Both views are already covered: the primary result uses the best-validation epoch (pre-specified, identical rule), and epoch 3 (the same fixed schedule for every cell) is evaluated whenever it differs, so a fixed-schedule comparison of all nine cells exists.
+    - Selecting checkpoints *by test-based metrics* would select on the test benchmarks themselves (test-set leakage) and is not adopted.
+    - Changing the LR would change the pre-specified recipe; not adopted without a new decision.
+  - **Changed vs copied validation loss:** a cheap diagnostic that directly tests the overconfidence reading: one validation pass per saved epoch adapter, reusing the line-diff mask of #86. ❓ Proposal for the user (diagnostic only; doesn't change training).
+  - **Masking / PAFT (3):** PAFT uses the same model and HumanEval-Java, and is the closest evidence for option (i) of #86. ❓ #86 stays open; the user decides whether it remains future work. PAFT should be cited either way (preprint, #70 venue check).
+  - **Split (reply 2):** Megadiff has no project field, so a project split isn't possible (#39); the file-path split and its limits are documented there. The test-based benchmarks are separate datasets, filtered for overlap with the training data (#39), so they already play the role of the held-out set. Split and checkpoint rules were fixed before the official runs (#39, #91).
 
 ---
 
