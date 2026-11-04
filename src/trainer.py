@@ -165,6 +165,8 @@ def parse_args(argv=None):
                    help="cap PyTorch GPU memory (e.g. 24 on a 48 GB card, to emulate a 24 GB GPU)")
     p.add_argument("--max_steps", type=int, default=-1, help="optimizer steps; > 0 overrides epochs (dry runs)")
     p.add_argument("--train_limit", type=int, help="use only the first N training examples (debugging)")
+    p.add_argument("--longest_n", type=int,
+                   help="train only on the N longest examples (in tokens): worst-case memory measurement")
     p.add_argument("--eval_limit", type=int, help="use only the first N validation examples (debugging)")
     p.add_argument("--no_eval", action="store_true", help="skip per-epoch validation loss")
     p.add_argument("--log_csv", default="results/train_log.csv")
@@ -194,6 +196,13 @@ def main(argv=None):
 
     train_ds, n_truncated, n_train_tokens, train_sha256 = load_split(
         args.data_dir, args.subset, "train", tokenizer, args.max_length, args.train_limit)
+    train_lengths = [len(x) for x in train_ds["input_ids"]]
+    if args.longest_n:
+        keep = sorted(range(len(train_lengths)), key=lambda i: -train_lengths[i])[:args.longest_n]
+        train_ds = train_ds.select(keep)
+        train_lengths = [train_lengths[i] for i in keep]
+        n_train_tokens = sum(train_lengths)
+        print(f"longest_n={args.longest_n}: sequences of {min(train_lengths)}–{max(train_lengths)} tokens")
     eval_ds, val_sha256 = None, ""
     if not args.no_eval:
         eval_ds, _, _, val_sha256 = load_split(args.data_dir, args.subset, "validation", tokenizer, args.max_length, args.eval_limit)
@@ -290,6 +299,9 @@ def main(argv=None):
         "max_steps": args.max_steps,
         "global_steps": trainer.state.global_step,
         "n_train": len(train_ds),
+        "longest_n": args.longest_n,
+        "min_seq_tokens": min(train_lengths),
+        "max_seq_tokens": max(train_lengths),
         "n_train_truncated": n_truncated,
         "train_data_sha256": train_sha256,
         "val_data_sha256": val_sha256,

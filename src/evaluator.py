@@ -126,13 +126,15 @@ def _n_generated(seq, eos_id, pad_id):
 
 @torch.no_grad()
 def generate_all(model, tokenizer, prompts, batch_size, max_new_tokens, n_samples=1, temperature=0.2, top_p=0.95,
-                 prof=None):
+                 prof=None, force_max_new_tokens=False):
     """Batched generation; prompts are length-sorted to cut padding, output keeps input order.
 
     batch_size counts sequences per generate() call. With n_samples <= batch_size, batch_size // n_samples
     prompts go into one call; with n_samples > batch_size, each prompt's samples are drawn in chunks of
     batch_size (the KV cache of 20 long sequences does not fit next to a 16-bit model, RESEARCH_LOG #46).
     Returns per prompt a list of n_samples outputs and token counts.
+    force_max_new_tokens: suppress EOS until max_new_tokens (worst-case KV cache for memory measurement only;
+    the outputs are not valid predictions).
     """
     order = sorted(range(len(prompts)), key=lambda i: len(prompts[i]))
     outputs, n_tokens = [[] for _ in prompts], [[] for _ in prompts]
@@ -145,6 +147,8 @@ def generate_all(model, tokenizer, prompts, batch_size, max_new_tokens, n_sample
         for done in range(0, n_samples, chunk):
             k_seq = min(chunk, n_samples - done)
             kwargs = _gen_kwargs(tokenizer, max_new_tokens, k_seq, temperature, top_p, sample=n_samples > 1)
+            if force_max_new_tokens:
+                kwargs["min_new_tokens"] = max_new_tokens
             out = model.generate(**enc, **kwargs)
             new = out[:, enc["input_ids"].shape[1]:]  # rows: prompt 0 × k_seq, prompt 1 × k_seq, ...
             for k, i in enumerate(idx):
@@ -205,6 +209,11 @@ def parse_args(argv=None):
     p.add_argument("--top_p", type=float, default=0.95)
     p.add_argument("--latency_samples", type=int, default=50, help="batch-size-1 latency probe size (0 = skip)")
     p.add_argument("--limit", type=int, help="first N records per file (debugging)")
+    p.add_argument("--longest_n", type=int,
+                   help="keep only the N longest prompts (in tokens): worst-case memory measurement")
+    p.add_argument("--force_max_new_tokens", action="store_true",
+                   help="generate exactly max_new_tokens per sample (EOS suppressed): worst-case KV cache; "
+                        "memory measurement only, outputs are not valid predictions")
     p.add_argument("--score", action="store_true", help="score Megadiff inline (EM, CodeBLEU, syntax; first sample)")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--no_description", action="store_true",
@@ -230,6 +239,10 @@ def main(argv=None):
     if args.no_description:
         records = strip_descriptions(records, args.benchmark)
     prompts = [chat_prompt(tokenizer, r["prompt"]) for r in records]
+    prompt_lens = [len(tokenizer(x, add_special_tokens=False)["input_ids"]) for x in prompts]
+    if args.longest_n:
+        keep = sorted(range(len(prompts)), key=lambda i: -prompt_lens[i])[:args.longest_n]
+        records, prompts, prompt_lens = [records[i] for i in keep], [prompts[i] for i in keep], [prompt_lens[i] for i in keep]
     print(f"{args.run_name}: {len(records)} prompts from {args.benchmark}")
 
     if torch.cuda.is_available():
@@ -243,7 +256,8 @@ def main(argv=None):
     set_seed(args.seed)  # sampling starts from the same RNG state for every model
     with GPUProfiler() as prof:
         predictions, n_tokens = generate_all(model, tokenizer, prompts, args.batch_size, args.max_new_tokens,
-                                             args.n_samples, args.temperature, args.top_p, prof)
+                                             args.n_samples, args.temperature, args.top_p, prof,
+                                             force_max_new_tokens=args.force_max_new_tokens)
     latency = latency_probe(model, tokenizer, prompts[:args.latency_samples], args.max_new_tokens) \
         if args.latency_samples > 0 else {}
 
@@ -270,6 +284,9 @@ def main(argv=None):
         "top_p": args.top_p if args.n_samples > 1 else None,
         "max_new_tokens": args.max_new_tokens,
         "hit_max_new_tokens": hit_limit,
+        "longest_n": args.longest_n,
+        "forced_max_new_tokens": args.force_max_new_tokens,
+        "max_prompt_tokens": max(prompt_lens) if prompt_lens else None,
         "model_load_s": round(load_s, 1),
         "static_vram_gib": static_vram,
         "gen_duration_s": p.get("duration_s"),
