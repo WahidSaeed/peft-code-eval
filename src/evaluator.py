@@ -9,6 +9,7 @@ Decoding (RESEARCH_LOG #37/#39):
   megadiff        greedy, 1 sample: Exact Match / CodeBLEU / syntax on the held-out split
   humanevalfix,   sampled, n = 20, temperature 0.2, top-p 0.95 (OctoPack protocol): pass@1, scored by execution.py
   humaneval_java  second run, --temperature 0.8 (Chen et al., 2021): pass@10 (RESEARCH_LOG #93)
+                  HumanEval-Java also with --no_description (secondary result, RESEARCH_LOG #96)
 
 Two measurement phases, both on the same loaded model:
   1. Batched generation over the whole test set → predictions JSONL, generation
@@ -67,8 +68,8 @@ _DESCRIPTION = re.compile(r"(Buggy method:\n)/\*.*?\*/\n", re.DOTALL)
 
 
 def strip_descriptions(records, benchmark):
-    """Diagnostic variant (RESEARCH_LOG #93): the HumanEval-Java prompt without the description comment,
-    i.e. the training format (instruction + buggy method). Never used for reported primary results."""
+    """HumanEval-Java prompt without the description comment, i.e. the training format (instruction + buggy
+    method). Diagnostic in RESEARCH_LOG #93; secondary result for the primary models since #96."""
     if benchmark != "humaneval_java":
         raise SystemExit("--no_description applies to humaneval_java only")
     out = []
@@ -207,7 +208,7 @@ def parse_args(argv=None):
     p.add_argument("--score", action="store_true", help="score Megadiff inline (EM, CodeBLEU, syntax; first sample)")
     p.add_argument("--seed", type=int, default=42)
     p.add_argument("--no_description", action="store_true",
-                   help="DIAGNOSTIC ONLY (RESEARCH_LOG #93): drop the description comment from HumanEval-Java prompts")
+                   help="HumanEval-Java without the description comment (secondary result, RESEARCH_LOG #93, #96)")
     p.add_argument("--max_vram_gib", type=float,
                    help="cap PyTorch GPU memory (e.g. 24 on a 48 GB card, to emulate a 24 GB GPU)")
     args = p.parse_args(argv)

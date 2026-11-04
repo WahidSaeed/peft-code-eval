@@ -2,7 +2,8 @@
 # Generate predictions for M0–M9 on the Megadiff test split (greedy, scored inline: EM / CodeBLEU / syntax)
 # and on HumanEvalFix-Java + HumanEval-Java (20 samples at T = 0.2 → pass@1; for primary results a second
 # 20 samples at T = 0.8 → pass@10, RESEARCH_LOG #93), then score the test-based benchmarks by running the
-# tests. Run on the GPU VM: execution.py runs model-written code.
+# tests. Primary results also get HumanEval-Java without the description comment (20 samples at T = 0.2,
+# secondary result, RESEARCH_LOG #96). Run on the GPU VM: execution.py runs model-written code.
 #   bash scripts/evaluate_all.sh            # all ten models
 #   bash scripts/evaluate_all.sh M0 M2      # selected models
 #   bash scripts/evaluate_all.sh M2_s43 M2_s44 M5_s43 M5_s44 M8_s43 M8_s44   # extra-seed adapters
@@ -19,10 +20,13 @@ MODELS=("${@:-M0 M1 M2 M3 M4 M5 M6 M7 M8 M9}")
 MODELS=(${MODELS[@]})
 mkdir -p results/predictions results/scores
 
-score_tests() {  # score_tests <run_name>: unit tests of both test-based benchmarks → results/scores/<run_name>_tests.json
-  python src/execution.py results/predictions/"$1"_humanevalfix_java.jsonl results/predictions/"$1"_humaneval_java.jsonl \
-    --per_sample_out "results/scores/$1_tests_per_sample.jsonl" > "results/scores/$1_tests.json"
-  cat "results/scores/$1_tests.json"
+score_tests() {  # score_tests <run_name> [prediction suffixes]: unit tests → results/scores/<run_name>_tests.json
+  local name="$1"; shift
+  local suffixes=("${@:-humanevalfix_java humaneval_java}"); suffixes=(${suffixes[@]})
+  local files=(); for s in "${suffixes[@]}"; do files+=("results/predictions/${name}_${s}.jsonl"); done
+  python src/execution.py "${files[@]}" \
+    --per_sample_out "results/scores/${name}_tests_per_sample.jsonl" > "results/scores/${name}_tests.json"
+  cat "results/scores/${name}_tests.json"
 }
 
 evaluate() {  # evaluate <run_name> <bits> <primary|secondary> [--adapter DIR]
@@ -43,11 +47,19 @@ evaluate() {  # evaluate <run_name> <bits> <primary|secondary> [--adapter DIR]
       --benchmark "$b" --temperature 0.8 --latency_samples 0
   done
   score_tests "${name}_t08"   # pass@10 (secondary metric)
+  # HumanEval-Java without the description comment (RESEARCH_LOG #96): the prompt is then exactly the Megadiff
+  # training format and the format of the closest LoRA-APR papers. Secondary result, primary models only,
+  # same decoding as the main run (n = 20, T = 0.2, 1,024 tokens); latency probe skipped.
+  echo "== ${name}_nodesc: humaneval_java without description, T = 0.2 ($(date -Is))"
+  python src/evaluator.py --bits "$bits" "$@" --run_name "${name}_nodesc" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} \
+    --benchmark humaneval_java --no_description --latency_samples 0
+  score_tests "${name}_nodesc" humaneval_java
 }
 
 # Checkpoint selection (RESEARCH_LOG #91): every cell is trained for all 3 epochs. The primary result <m> uses the
 # epoch with the lowest validation loss (results/runs/<m>/best_epoch.json, written by the trainer). If that is not
-# the last epoch, the final adapter is evaluated as well, as <m>_final (secondary result; T = 0.2 only).
+# the last epoch, the final adapter is evaluated as well, as <m>_final (secondary result; T = 0.2 only,
+# with descriptions only).
 for m in "${MODELS[@]}"; do
   cell="${m%%_s*}"   # M2_s43 -> M2
   if [[ "$m" == "M0" ]]; then evaluate M0 "${BITS[$cell]}" primary; continue; fi

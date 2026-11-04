@@ -1470,7 +1470,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
     - **Gap between the fine-tuned pilot and M0:** with descriptions −7.8 pp (57.2 vs 65.0), without −1.7 pp (42.2 vs 43.9). Most of the pilot's HumanEval-Java deficit is therefore about **how much each model gains from the description**: fine-tuning on Megadiff, whose prompts never contain one, seems to weaken the use of a natural-language specification. On the buggy code alone the two are close.
     - pass@10 without descriptions: M0 66.1 vs pilot 47.9. The pilot's collapsed sampling (2 distinct outputs of 20) still dominates pass@10 at T = 0.2, which supports the T = 0.8 decision.
     - Pilot only (epoch-3 adapter, A10/A10G mix, one seed): an indication, not a thesis result.
-    - ❓ **Decision for the user:** add a **no-description HumanEval-Java variant** as a secondary result for the official models? Arguments for:
+    - ❓ **Decision for the user:** add a **no-description HumanEval-Java variant** as a secondary result for the official models? (→ ✅ yes, #96) Arguments for:
       - It separates "repairs the bug" from "uses the specification", which is where the M0-vs-fine-tuned difference sits.
       - It is the format of the closest papers (Lee et al., Patricio et al.; Jiang et al.), so our numbers become comparable with theirs.
       - Cost: ~1–1.2 A10-h per model at T = 0.2.
@@ -1523,6 +1523,23 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - Whether the edit-token loss is what rises after epoch 1, and whether the copy-token loss moves at all, will come from the official runs (three epoch adapters per cell). This also means early epochs are selected on edit-token loss in practice, which strengthens the #91 rule.
 - **Forum reply draft:** thanks; what changed (split loss logged, with the 94% figure; pass@10 at T = 0.8; best-validation epoch plus epoch 3 for all, no selection on test benchmarks; masking/PAFT as future work; asks for the DM-SFT link); the split answer for reply 2.
 
+### 96. Decision: no-description HumanEval-Java variant as a secondary result for the official models ✅
+- **User decision (2026-11-03), on the question in #93:** add the no-description HumanEval-Java run as a **secondary result** for the official models ✅.
+- **Why** (from #93):
+  - The description diagnostic showed the description is worth +21.0 pp to M0 and +15.0 pp to the fine-tuned pilot. The pilot's deficit vs M0 is −7.8 pp with descriptions and −1.7 pp without, so the M0-vs-fine-tuned comparison on HumanEval-Java partly measures how well each model uses a natural-language specification.
+  - The no-description prompt is exactly the Megadiff training format (instruction + buggy method), and none of the closest LoRA-APR papers (Jiang et al., Lee et al., Patricio et al., RepairLLaMA, Li et al.) gives a problem description. Their prompt formats still differ in other ways (e.g. marked defect lines), so the comparison is "no description on either side", not an identical prompt.
+- **What stays the same:** the primary HumanEval-Java result keeps its descriptions (#40, #53, #93); the no-description run doesn't replace it.
+- **Scope, as costed in #93:**
+  - Primary results only: M0, M1–M9 at the best-validation epoch, and the seed runs (16 models). Not the `_final` adapters (#91).
+  - Same decoding as the primary run: n = 20, T = 0.2, top-p 0.95, seed 42, `max_new_tokens` 1,024. Reports pass@1. pass@10 at T = 0.2 and distinct outputs are descriptive only (no T = 0.8 run for this variant; it wasn't part of the costed proposal).
+  - No latency probe (RQ3 timing comes from the primary run).
+- **Code:**
+  - `scripts/evaluate_all.sh`: for primary results, after the T = 0.8 run, `<name>_nodesc` = HumanEval-Java with `--no_description --latency_samples 0`, scored into `results/scores/<name>_nodesc_tests.json`. `score_tests` now takes the list of benchmarks to score (default: both).
+  - `src/evaluator.py`: `--no_description` help text and docstring no longer say "diagnostic only".
+  - Tested in a bash 5.2 container with a stub `python` (M0, M2 with best epoch 1, M5 with best epoch 3): M0, M2 and M5 get `_nodesc` with the right adapter; `M2_final` doesn't; the scorer gets only the HumanEval-Java file.
+- **Cost:** ~1–1.2 A10-h per model (pilot timing, #93) → ~16–19 GPU-h for 16 models. Peak VRAM in the pilot: 17.9 GiB for M0 at 16 bits, inside 24 GB.
+- **How it will be read:** reported next to the primary HumanEval-Java numbers for every model, together with the description gain (with − without) per model. The thesis discusses it as the format effect (#93) and as the comparison point for the no-description papers.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1546,6 +1563,6 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 19. ~~Prevent overfitting~~ → best-validation-epoch selection without early stopping (full 3 epochs kept for the epoch-3 evidence) (#91).
 18. ~~Secondary analysis~~ → reversed: the best-validation epoch is primary, epoch 3 is evaluated as the secondary result when it differs (#91).
 22. ~~pass@10 temperature (Q2)~~ → second n = 20 run at T = 0.8 for primary results (#93).
-23. ~~HumanEval-Java description vs training format (Q3)~~ → keep descriptions, budget 1,024 tokens (#93). Diagnostic done: the description is worth +21 pp to M0 and +15 pp to the fine-tuned pilot. Add a no-description variant as a secondary result? ❓
+23. ~~HumanEval-Java description vs training format (Q3)~~ → keep descriptions, budget 1,024 tokens (#93). Diagnostic done: the description is worth +21 pp to M0 and +15 pp to the fine-tuned pilot. No-description variant → added as a secondary result for the primary models (#96).
 24. ~~Changed vs copied validation loss~~ → added to the official runs (#95).
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
