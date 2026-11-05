@@ -8,7 +8,7 @@
 #   1. Training, typical: 50 optimizer steps, seed 42, full training set (identical batches in every cell).
 #   2. Training, worst case: the 80 longest training sequences (all near the 768-token cap), 5 steps.
 #   3. Inference, worst case: the longest prompt of HumanEvalFix-Java and of HumanEval-Java, 20 samples in
-#      chunks of 10, every sample forced to max_new_tokens (largest possible KV cache). M0 + the 9 adapters
+#      chunks of 5 (evaluator default; chunks of 10 ran out of memory for 16-bit adapters on HumanEval-Java), every sample forced to max_new_tokens (largest possible KV cache). M0 + the 9 adapters
 #      from part 1 (adapter quality is irrelevant for memory; only its size matters).
 # Validation is off (--no_eval): the peak covers training steps only.
 set -uo pipefail
@@ -19,7 +19,7 @@ declare -A BITS=( [M1]=4 [M2]=4 [M3]=4 [M4]=8 [M5]=8 [M6]=8 [M7]=16 [M8]=16 [M9]
 declare -A RANK=( [M1]=8 [M2]=16 [M3]=32 [M4]=8 [M5]=16 [M6]=32 [M7]=8 [M8]=16 [M9]=32 )
 CELLS=("${@:-M1 M2 M3 M4 M5 M6 M7 M8 M9}"); CELLS=(${CELLS[@]})
 OUT=results/m609
-mkdir -p "$OUT/runs" "$OUT/predictions"
+mkdir -p "$OUT/runs" "$OUT/predictions_bs5"
 nvidia-smi --query-gpu=name,memory.total,driver_version,power.limit --format=csv | tee -a "$OUT/gpu.txt"
 echo "${M609_COMMIT:-unknown}" | tee -a "$OUT/commit.txt"   # the container has no .git; the launcher passes the hash
 
@@ -39,16 +39,17 @@ for c in "${CELLS[@]}"; do train "$c" worstcase --longest_n 80 --max_steps 5; do
 infer() {  # infer <name> <bits> [--adapter DIR]
   local name="$1" bits="$2"; shift 2
   for b in humanevalfix humaneval_java; do
-    local f="$OUT/predictions/${name}_$([[ $b == humanevalfix ]] && echo humanevalfix_java || echo $b).jsonl"
+    local f="$OUT/predictions_bs5/${name}_$([[ $b == humanevalfix ]] && echo humanevalfix_java || echo $b).jsonl"
     [[ -f "$f" ]] && { echo "== $name $b: done, skipping"; continue; }
     echo "== $name $b: worst-case inference ($(date -Is))"
     python src/evaluator.py --bits "$bits" "$@" --run_name "$name" --benchmark "$b" --longest_n 1 \
-      --force_max_new_tokens --latency_samples 0 --output_dir "$OUT/predictions" --log_csv "$OUT/infer_worstcase.csv"
+      --force_max_new_tokens --latency_samples 0 --output_dir "$OUT/predictions_bs5" --log_csv "$OUT/infer_worstcase_bs5.csv" \
+      || echo "== $name $b: FAILED"
   done
 }
 infer M0 16
 for c in "${CELLS[@]}"; do
   a="$OUT/runs/typical_${c}/adapter"
-  [[ -d "$a" ]] && infer "$c" "${BITS[$c]}" --adapter "$a" || echo "== $c: no adapter, skipping inference"
+  if [[ -d "$a" ]]; then infer "$c" "${BITS[$c]}" --adapter "$a"; else echo "== $c: no adapter, skipping inference"; fi
 done
-echo "== M609 memory grid finished ($(date -Is)): $OUT/train_typical.csv, train_worstcase.csv, infer_worstcase.csv"
+echo "== M609 memory grid finished ($(date -Is)): $OUT/train_typical.csv, train_worstcase.csv, infer_worstcase_bs5.csv"
