@@ -201,8 +201,8 @@ def parse_args(argv=None):
     p.add_argument("--data_dir", default="data")
     p.add_argument("--output_dir", default="results/predictions")
     p.add_argument("--log_csv", default="results/eval_log.csv")
-    p.add_argument("--batch_size", type=int, default=10,
-                   help="sequences per generate() call; 20 samples are drawn as 2 x 10 (fits a 16-bit model on 24 GB)")
+    p.add_argument("--batch_size", type=int, default=5,
+                   help="sequences per generate() call; 20 samples are drawn as 4 x 5: 2 x 10 runs out of memory for 16-bit fine-tuned models on HumanEval-Java at 1,024 tokens (A10G, 24 GB)")
     p.add_argument("--max_new_tokens", type=int, help=f"default per benchmark: {MAX_NEW_TOKENS}")
     p.add_argument("--n_samples", type=int, help=f"samples per prompt; 1 = greedy. Default per benchmark: {N_SAMPLES}")
     p.add_argument("--temperature", type=float, default=0.2)
