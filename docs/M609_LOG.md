@@ -22,7 +22,7 @@ Conventions as in `RESEARCH_LOG.md`: ✅ done · 🔄 in progress · ⏳ waiting
 | Literature review outline + paper draft | 🔄 | Kept outside this repo (M8) |
 | Thesis follow-up: chunk size for the official evaluation | 📋 backlog on `main` | Logged in `RESEARCH_LOG.md` #97 (M9, M10) |
 | Tutor questions (generative-AI use, venue/template, Harvard vs template) | ⏳ user | User will ask later (M10) |
-| 16-bit inference at chunks of 2 (16 GB prediction) | 📋 backlog | M10 |
+| Modal removed from the M609 study | ✅ | No further GPU runs; chunks-of-2 test dropped (M11) |
 | Figures + LaTeX template | 📋 backlog | After the venue is agreed (M10) |
 
 ---
@@ -113,7 +113,11 @@ User decisions on the six next steps proposed after draft 1:
 
    Draft 1 is now 2,945 words of prose. The user still has to rewrite it in their own words.
 3. **References added to Zotero** ✅. The 9 missing references (Micikevicius 2018, Rajbhandari 2020, Korthikanti 2023, Frantar 2023, Lin 2024, Li 2024 LoftQ, Xu 2024, Dao 2022, Kwon 2023) were imported into "Thesis - PEFT APR", tagged `M609` and `verify-metadata`. The metadata was entered by hand, so page numbers and author lists still need checking against the proceedings. The two Li et al. (2024) papers are cited as 2024a (ASE) and 2024b (LoftQ).
-4. **Measure 16-bit inference at chunks of 2** 📋 backlog. It would turn the 16 GB prediction into a measurement (~USD 1).
+4. ~~**Measure 16-bit inference at chunks of 2**~~ dropped (M11). The 16 GB fit stays an untested prediction in the paper.
 5. **Figures and LaTeX** 📋 backlog: draw the taxonomy figure, add bar charts for Tables 2–3, and move the draft into the venue template once it is agreed.
 6. **Thesis chunk size** 📋 backlog on `main`, logged in `RESEARCH_LOG.md` #97 at the user's request, to be revisited before the official evaluation.
 
+### M11. Modal removed from the M609 study (2026-11-07) ✅
+- **User decision:** Modal is no longer used for the M609 study, so no further GPU runs are planned for the paper.
+- The M10 backlog item "16-bit inference at chunks of 2" is dropped. The paper keeps the *c* ≤ 2 / 16 GB fit as an untested prediction, as worded in draft 1 (M10 item 2).
+- All paper results stay as measured (M4–M7, A10G/A10 on Modal). The Modal provenance is described as it happened.
