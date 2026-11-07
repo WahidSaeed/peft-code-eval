@@ -88,12 +88,12 @@ Worst case: longest prompt (HumanEvalFix-Java 923 tokens + 768 output; HumanEval
 - Chunks of 5 cut the peak by 4.2–4.5 GiB at every precision. Rank adds 0.15–0.30 GiB.
 - Worst-case generation time: 4-bit 260–350 s, 8-bit 610–820 s, 16-bit 175–280 s.
 - **Fit (answer to the RQ):** 24 GB: every set-up, training and inference. 16 GB (~15.5 GiB usable): 4-bit and 8-bit training and inference fit; 16-bit inference doesn't (17.2–17.7 GiB); 16-bit training is borderline (15.1 allocated / 15.8 reserved).
-- Total module GPU cost ≈ USD 6–7 (details in the private ops log).
+- Total module GPU cost ≈ USD 9–10: grid ≈ 6, A10 check ≈ 0.35, chunk-of-5 re-run ≈ 3 (estimates, not yet checked against the bill; details in the private ops log).
 
 ### M8. Paper material (2026-11-04 onwards) 🔄
 - Email to the module leader explaining the reduced scope: drafted, not sent (private).
 - Literature review outline: taxonomy T1 memory components, T2 PEFT, T3 quantization (inference / quantized fine-tuning), T4 systems techniques, T5 empirical memory/APR studies. The comparison table was filled from the PDFs. Closest prior work: Weyssow et al. 2025 (TOSEM; 16/8/4-bit training peak, one rank, attention only), Lee et al. 2026 (IST; 4-bit only), Le Cong et al. 2026 (ICSE; inference only), Vallecillos-Ruiz et al. 2026 (ICSME; post-training quantization, inference). Gap: rank × precision crossed, all-linear LoRA, sampled-generation inference peak per precision, worst-case bounds, training + inference on one model and GPU.
-- Paper draft started 2026-11-06 (private).
+- Paper draft 1 written 2026-11-06 (private): all sections, 2,931 words of prose, 34 references (29 in the literature review), 5 tables.
 
 ### M9. Open item for the thesis (not applied to `main`) ❓
 - ⚠️ The thesis evaluation (#93/#96: HumanEval-Java at 1,024 tokens, n = 20) uses chunks of 10 on `main`. M5 shows the 16-bit fine-tuned models can run out of memory there on a 24 GB A10G. M7 shows chunks of 5 fix it (≤ 17.7 GiB) at ~1.5× the generation time.
