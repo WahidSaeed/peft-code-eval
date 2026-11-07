@@ -35,6 +35,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | RunPod fallback (RTX 4090, $0.90/h) | 📋 backlog | Only if AWS denies the appeal (#23) |
 | Training recipe for the official runs (overfitting) | ✅ | 3 epochs, primary = epoch with the lowest validation loss, epoch 3 secondary (#91) |
 | Megadiff token cap 1,024 (~25.7k training pairs) | 📋 backlog | Counted only; revisit after the 18k M2 pilot (#79) |
+| Generation chunk size for the official evaluation (OOM risk) | 📋 backlog ⚠️ | Chunks of 10 ran out of memory for 16-bit adapters on HumanEval-Java; chunks of 5 fit (#97) |
 | Public GitHub repo | ✅ | https://github.com/WahidSaeed/peft-code-eval (#18) |
 
 ---
@@ -1540,6 +1541,20 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Cost:** ~1–1.2 A10-h per model (pilot timing, #93) → ~16–19 GPU-h for 16 models. Peak VRAM in the pilot: 17.9 GiB for M0 at 16 bits, inside 24 GB.
 - **How it will be read:** reported next to the primary HumanEval-Java numbers for every model, together with the description gain (with − without) per model. The thesis discusses it as the format effect (#93) and as the comparison point for the no-description papers.
 
+### 97. Backlog ⚠️: 16-bit fine-tuned models can run out of memory on HumanEval-Java at chunks of 10 📋
+- **Source (2026-11-04 to 06):** a worst-case GPU-memory measurement for the separate M609 module paper, run on the local branch `m609-memory-study`. Its code and log (`docs/M609_LOG.md`) are not on `main`, and this entry changes no code here.
+- **Finding, NVIDIA A10G with 22.06 GiB usable:**
+  - Set-up: HumanEval-Java worst case, i.e. the longest prompt (771 tokens) with all 20 samples forced to 1,024 new tokens, as in #93/#96.
+  - At the current default `--batch_size 10` (2 × 10 samples), M7–M9 (16-bit + adapter) hit `torch.OutOfMemoryError` at 21.4 GiB allocated.
+  - M0 just fitted (21.46 allocated / 21.72 reserved).
+- **With `--batch_size 5`:**
+  - All 10 models fit. 16-bit + adapter peaks at 17.09–17.31 allocated / 17.32–17.65 reserved.
+  - Worst-case generation takes ~1.5× as long (e.g. M0 227 s vs 159 s).
+  - Peaks for the same code, model and input were identical to the MB on an A10.
+- **Why it matters:** the official HumanEval-Java runs (primary, `_t08`, `_nodesc`) for M7–M9 and the M8 seeds could crash mid-evaluation on a 24 GB A10/A10G whenever a task's samples run long. This is a worst case, but it can't be ruled out.
+- **Option to decide before the official evaluation:** set `--batch_size 5` for all models. A uniform setting keeps sampling identical across models. The cost is roughly 1.5× the generation time, to be measured on a real run before re-costing #93/#96.
+- **Status:** backlog, at the user's request (2026-11-07). To revisit before the official evaluation starts. Nothing changed on `main`.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1566,3 +1581,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 23. ~~HumanEval-Java description vs training format (Q3)~~ → keep descriptions, budget 1,024 tokens (#93). Diagnostic done: the description is worth +21 pp to M0 and +15 pp to the fine-tuned pilot. No-description variant → added as a secondary result for the primary models (#96).
 24. ~~Changed vs copied validation loss~~ → added to the official runs (#95).
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
+25. Generation chunk size for the official evaluation: keep 10 (OOM risk for 16-bit adapters on HumanEval-Java) or use 5 for all models (#97) 📋 backlog ❓
