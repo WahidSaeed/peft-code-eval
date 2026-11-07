@@ -23,6 +23,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | `src/execution.py` (pass@1, pass@10) | ✅ | HumanEvalFix-Java + HumanEval-Java: clean sets canonical 100 % / buggy 0 % (#39); other HEF languages validated in #22 |
 | GPU dry run | ✅ | Modal A10/A10G: all bit-widths fit 24 GB; ~170–200 GPU-h total (#46) |
 | AWS GPU quota (eu-central-1) | ⏳ | Denied → appeal sent 2026-10-20 (see #14, #15); user to raise it through an AWS student programme (#80) |
+| Modal | ✅ closed | No longer used; official runs on AWS or RunPod (#98) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
 | Phase 0: reproduce Tier-A papers | ✅ | Li et al. reproduced on HumanEval-Java (#63); RepairLLaMA DeepSeek-LoRA reproduced exactly, 91/134 (#73); Huang and Wei not reproduced, with reasons (#64) |
@@ -1555,6 +1556,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Option to decide before the official evaluation:** set `--batch_size 5` for all models. A uniform setting keeps sampling identical across models. The cost is roughly 1.5× the generation time, to be measured on a real run before re-costing #93/#96.
 - **Status:** backlog, at the user's request (2026-11-07). To revisit before the official evaluation starts. Nothing changed on `main`.
 
+### 98. Decision: Modal is no longer used; the official runs go on AWS or RunPod ✅
+- **User decision (2026-11-07):** Modal is removed from the study. Both Modal apps were stopped, and no further jobs will run there.
+- **What ran on Modal (all done):** the GPU dry run (#46), the Phase 0 checks, the 10k and 18k M2 pilots (#73, #90), the description diagnostic (#93) and the M609 memory grid (#97). All of their outputs (results, predictions, logs, pilot adapters) are kept in a local backup, so every number already reported in this log stays traceable.
+- **Official runs:** none had started on Modal, so nothing has to be redone. The platform is now **AWS A10G** (G/VT quota still 0; being raised through the AWS student programme, #80) or **RunPod** (RTX 4090 configuration from #23/#62). The one-GPU-model rule (#49) still holds: all official runs go on a single GPU model, whichever platform is chosen.
+- **Code:** `scripts/modal_app.py` stays in the repo as the record of how the pilots were run. Official runs use the VM path (`scripts/setup_gpu_vm.sh`, `requirements.lock.txt`).
+- **Consequence for #97:** the chunk-size finding was measured on an A10G. If the official runs go on a different board (e.g. an RTX 4090, 24 GB), the out-of-memory margin should be checked there before the official evaluation.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1562,13 +1570,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 2. ~~Multiple seeds~~ → 3 seeds (42/43/44) for M2, M5, M8 (#27).
 3. ~~M0~~ → zero-shot (#27).
 4. ~~Phase 0 reproduction~~ → Li et al. adapter re-run on HumanEval-Java: generation reproduced (146/163 identical top beams); harness agrees within 3 pp on comparable tasks (#63). Retraining not planned.
-5. GPU platform: **AWS A10G** if the appeal is approved; **RunPod RTX 4090 (backlog)** only if denied (#23).
+5. GPU platform: **AWS A10G** if the appeal is approved; **RunPod RTX 4090 (backlog)** only if denied (#23). Modal dropped (#98).
 7. ~~Other HumanEvalPack languages~~ → added (#22), then dropped from the study: evaluation is Java only (#37, #39).
 6. ~~Second language~~ → HumanEvalFix added (#20). RQ wording updated in the plan (#44); the thesis text follows when written.
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
-11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); user to ask during the AWS student programme onboarding (#80); RunPod RTX 4090 is the user's leaning (#62). ❓
+11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); user to ask during the AWS student programme onboarding (#80); RunPod RTX 4090 is the user's leaning (#62). Modal removed from the study; AWS or RunPod only (#98). ❓
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
