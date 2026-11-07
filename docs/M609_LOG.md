@@ -20,7 +20,10 @@ Conventions as in `RESEARCH_LOG.md`: ✅ done · 🔄 in progress · ⏳ waiting
 | Inference memory grid, chunks of 5 | ✅ | All 20 cells fit (M6, M7) |
 | Email to the module leader about the scope | ✅ draft | Not sent; kept outside this repo (M8) |
 | Literature review outline + paper draft | 🔄 | Kept outside this repo (M8) |
-| Thesis follow-up: chunk size for the official evaluation | ❓ | `main` still uses chunks of 10 (M9) |
+| Thesis follow-up: chunk size for the official evaluation | 📋 backlog on `main` | Logged in `RESEARCH_LOG.md` #97 (M9, M10) |
+| Tutor questions (generative-AI use, venue/template, Harvard vs template) | ⏳ user | User will ask later (M10) |
+| 16-bit inference at chunks of 2 (16 GB prediction) | 📋 backlog | M10 |
+| Figures + LaTeX template | 📋 backlog | After the venue is agreed (M10) |
 
 ---
 
@@ -98,3 +101,19 @@ Worst case: longest prompt (HumanEvalFix-Java 923 tokens + 768 output; HumanEval
 ### M9. Open item for the thesis (not applied to `main`) ❓
 - ⚠️ The thesis evaluation (#93/#96: HumanEval-Java at 1,024 tokens, n = 20) uses chunks of 10 on `main`. M5 shows the 16-bit fine-tuned models can run out of memory there on a 24 GB A10G. M7 shows chunks of 5 fix it (≤ 17.7 GiB) at ~1.5× the generation time.
 - To decide for the thesis separately (the user's call), then log in `RESEARCH_LOG.md` on `main`.
+
+### M10. Next steps after draft 1 (2026-11-07) ✅
+User decisions on the six next steps proposed after draft 1:
+1. **Tutor questions** (generative-AI use, venue and template, Harvard vs template citations): the user will ask later ⏳.
+2. **Unmeasured statements in the draft**, done ✅. They are now worded as estimates, hypotheses or untested predictions:
+   - the 16 GB fit criterion and its usable-memory budgets;
+   - the *c* ≤ 2 prediction;
+   - the dequantization explanation of the quantized training overhead;
+   - the headroom/fragmentation explanation of the *c* = 10 out-of-memory error.
+
+   Draft 1 is now 2,945 words of prose. The user still has to rewrite it in their own words.
+3. **References added to Zotero** ✅. The 9 missing references (Micikevicius 2018, Rajbhandari 2020, Korthikanti 2023, Frantar 2023, Lin 2024, Li 2024 LoftQ, Xu 2024, Dao 2022, Kwon 2023) were imported into "Thesis - PEFT APR", tagged `M609` and `verify-metadata`. The metadata was entered by hand, so page numbers and author lists still need checking against the proceedings. The two Li et al. (2024) papers are cited as 2024a (ASE) and 2024b (LoftQ).
+4. **Measure 16-bit inference at chunks of 2** 📋 backlog. It would turn the 16 GB prediction into a measurement (~USD 1).
+5. **Figures and LaTeX** 📋 backlog: draw the taxonomy figure, add bar charts for Tables 2–3, and move the draft into the venue template once it is agreed.
+6. **Thesis chunk size** 📋 backlog on `main`, logged in `RESEARCH_LOG.md` #97 at the user's request, to be revisited before the official evaluation.
+
