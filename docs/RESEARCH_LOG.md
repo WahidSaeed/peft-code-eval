@@ -1569,6 +1569,8 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Smoke test design:** a g5.2xlarge on the Deep Learning OSS Nvidia Driver AMI (PyTorch 2.7, Ubuntu 22.04, build 20260427) with no SSH key and no open ports. User data runs `nvidia-smi`, prints the torch/CUDA versions and runs a bf16 8192² matmul. The output goes to the serial console, then the instance shuts down (shutdown = terminate; 20-minute failsafe).
 - **Result so far:** the quota check passed (no `VcpuLimitExceeded`). Every launch failed with `InsufficientInstanceCapacity` in eu-central-1a, 1b and 1c, and also for g5.xlarge (same A10G). This is an AWS-side shortage in Frankfurt, not an account limit.
 - **Action:** a retry loop tries g5.2xlarge, then g5.xlarge, every 2 minutes for up to an hour. The result will be added here.
+- **Lyceum checked as another platform (2026-11-10, user request):** Lyceum is a GPU cloud from Berlin with EU data centres. It offers no A10G or other 24 GB card. The cheapest options are L40S 48 GB ($2.19/h on demand, $1.09/h spot) and A100 80 GB ($2.59 / $1.29). Billing is per second and there's no subscription. Access is through SSH VMs or serverless container runs. The pages mention no free credits or academic programme. Using it would mean running the whole study on an L40S, because GPU models can't be mixed, and paying out of pocket rather than from the AWS credit. Not adopted; noted for the user.
+
 - **Open for the user if capacity stays unavailable:** keep retrying in Frankfurt, use another EU region (needs its own quota request), or use RunPod (#23). The quota is per region.
 
 ---
