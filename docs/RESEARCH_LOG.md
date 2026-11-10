@@ -22,7 +22,7 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | `scripts/run_matrix.sh`, `scripts/evaluate_all.sh` | ✅ | Tested in a bash 5 container (#26) |
 | `src/execution.py` (pass@1, pass@10) | ✅ | HumanEvalFix-Java + HumanEval-Java: clean sets canonical 100 % / buggy 0 % (#39); other HEF languages validated in #22 |
 | GPU dry run | ✅ | Modal A10/A10G: all bit-widths fit 24 GB; ~170–200 GPU-h total (#46) |
-| AWS GPU quota (eu-central-1) | ✅ | 8 vCPUs for G/VT on-demand granted 2026-11-10 (one g5.2xlarge); first launch blocked by AWS capacity in all 3 AZs, retrying (#99) 🔄 |
+| AWS GPU quota (eu-central-1) | ✅ | 8 vCPUs for G/VT on-demand granted 2026-11-10; Frankfurt capacity scarce; smoke test passed on g5.xlarge (A10G) (#99) |
 | Modal | ✅ closed | No longer used; official runs on AWS or RunPod (#98) |
 | AWS budget alert (credits excluded) | ✅ | (#16) |
 | AWS IAM user with MFA | ✅ | (#17) |
@@ -1563,12 +1563,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Code:** `scripts/modal_app.py` stays in the repo as the record of how the pilots were run. Official runs use the VM path (`scripts/setup_gpu_vm.sh`, `requirements.lock.txt`).
 - **Consequence for #97:** the chunk-size finding was measured on an A10G. If the official runs go on a different board (e.g. an RTX 4090, 24 GB), the out-of-memory margin should be checked there before the official evaluation.
 
-### 99. AWS G/VT quota granted; first GPU launch blocked by capacity 🔄
+### 99. AWS G/VT quota granted; first GPU smoke test passed on g5.xlarge ✅
 **2026-11-10.** AWS raised the on-demand G and VT instance quota in eu-central-1 to **8 vCPUs**, which is one g5.2xlarge (A10G, 24 GB). Checked with the CLI under the IAM user: `L-DB2E81BA` = 8.0.
 
 - **Smoke test design:** a g5.2xlarge on the Deep Learning OSS Nvidia Driver AMI (PyTorch 2.7, Ubuntu 22.04, build 20260427) with no SSH key and no open ports. User data runs `nvidia-smi`, prints the torch/CUDA versions and runs a bf16 8192² matmul. The output goes to the serial console, then the instance shuts down (shutdown = terminate; 20-minute failsafe).
 - **Result so far:** the quota check passed (no `VcpuLimitExceeded`). Every launch failed with `InsufficientInstanceCapacity` in eu-central-1a, 1b and 1c, and also for g5.xlarge (same A10G). This is an AWS-side shortage in Frankfurt, not an account limit.
-- **Action:** a retry loop tries g5.2xlarge, then g5.xlarge, every 2 minutes for up to an hour. The result will be added here.
+- **Action:** a retry loop tried g5.2xlarge, then g5.xlarge, every 2 minutes. Round 5 (12:47 UTC) got a **g5.xlarge** in eu-central-1b; g5.2xlarge was still unavailable.
+- **Smoke test result ✅:** NVIDIA A10G, 23,028 MiB (22.1 GiB in torch), driver 580.126.09 (CUDA 13.0 driver API). The AMI ships torch 2.7.0+cu128, CUDA available, bf16 supported. Measured bf16 8192² matmul: 5.4 TFLOPS. That number is far below the card's real throughput, because the timed loop had no warm-up (cuBLAS initialisation and clock ramp-up were counted), so it's only a check that things run, not a benchmark. The instance shut itself down and terminated after ~3.5 min, costing a few cents of credit.
+- **Open for the user:** whether official runs may use g5.xlarge (same A10G; 4 vCPUs / 16 GB RAM instead of 8 / 32 GB) when g5.2xlarge has no capacity. Host RAM headroom for loading 16-bit models should be checked first.
 - **Lyceum checked as another platform (2026-11-10, user request):** Lyceum is a GPU cloud from Berlin with EU data centres. It offers no A10G or other 24 GB card. The cheapest options are L40S 48 GB ($2.19/h on demand, $1.09/h spot) and A100 80 GB ($2.59 / $1.29). Billing is per second and there's no subscription. Access is through SSH VMs or serverless container runs. The pages mention no free credits or academic programme. Using it would mean running the whole study on an L40S, because GPU models can't be mixed, and paying out of pocket rather than from the AWS credit. No decision made; it is the user's call.
 
 - **Open for the user if capacity stays unavailable:** keep retrying in Frankfurt, use another EU region (needs its own quota request), or use RunPod (#23). The quota is per region.
@@ -1586,7 +1588,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
-11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); user to ask during the AWS student programme onboarding (#80); RunPod RTX 4090 is the user's leaning (#62). Modal removed from the study; AWS or RunPod only (#98). AWS quota granted 2026-11-10 (8 vCPUs); first launch blocked by capacity (#99) 🔄
+11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); user to ask during the AWS student programme onboarding (#80); RunPod RTX 4090 is the user's leaning (#62). Modal removed from the study; AWS or RunPod only (#98). AWS quota granted 2026-11-10 (8 vCPUs); smoke test passed on a g5.xlarge (A10G) after capacity retries (#99); g5.xlarge vs g5.2xlarge ❓
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
