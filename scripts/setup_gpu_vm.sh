@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # One-time setup of a fresh Ubuntu GPU VM (22.04/24.04, NVIDIA driver preinstalled by the provider).
 #   bash scripts/setup_gpu_vm.sh            # run from the repository root on the VM
-# Installs Python tooling, JDK 8 + default JDK (test harnesses), a venv with requirements.txt,
-# and the HumanEval-Java checkout. Data files are built separately (src/data_loader.py) or copied in.
+# Installs JDK 8 + default JDK (test harnesses), a Python 3.11 venv (via uv) with the pinned
+# requirements.lock.txt, and the HumanEval-Java checkout. Python 3.11 is required: the lock file was frozen
+# on 3.11 and pins numpy 2.4.6 (needs >= 3.11), while Ubuntu 22.04 ships 3.10 (RESEARCH_LOG #99). Data files are built separately (src/data_loader.py) or copied in.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -10,11 +11,13 @@ nvidia-smi || { echo "no NVIDIA driver: install one first (provider GPU image re
 
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -q
-sudo apt-get install -y -q python3-venv python3-pip git default-jdk openjdk-8-jdk-headless tmux
+sudo apt-get install -y -q curl git default-jdk openjdk-8-jdk-headless tmux
 
-python3 -m venv .venv
-.venv/bin/pip install -q --upgrade pip
-.venv/bin/pip install -q -r requirements.txt
+command -v uv >/dev/null || curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv venv -q --python 3.11 .venv   # uv downloads a standalone Python 3.11 if the system has none
+uv pip install -q --python .venv/bin/python -r requirements.lock.txt
+.venv/bin/python -c 'import sys; assert sys.version_info[:2] == (3, 11), sys.version'
 
 if [[ ! -d data/clm ]]; then
   git clone -q https://github.com/lin-tan/clm data/clm
