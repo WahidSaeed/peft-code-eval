@@ -33,18 +33,20 @@ source .venv/bin/activate
 export HEJ_JAVA_HOME=${HEJ_JAVA_HOME:-$(ls -d /usr/lib/jvm/java-8-openjdk-* | head -1)}
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True   # same as the Modal pilots (RESEARCH_LOG #46)
 
-stage() { STAGE="$1"; echo "=== $(date -Is) STAGE $STAGE" | tee -a "$LOG"; push; }
+stage() { STAGE="$1"; echo "$STAGE" > results/.stage; echo "=== $(date -Is) STAGE $STAGE" | tee -a "$LOG"; push; }
 push() {  # results/ -> S3 (never deletes in S3; the bucket is versioned), plus a status file.
   # Runs in a subshell with errexit off and always returns 0: monitoring must never stop the campaign.
   (
     set +e +o pipefail
-    { echo "card=$CARD stage=${STAGE:-start} time=$(date -Is) host=$(hostname) commit=$(git rev-parse --short HEAD)"
+    { echo "card=$CARD stage=$(cat results/.stage 2>/dev/null || echo "${STAGE:-start}") time=$(date -Is) host=$(hostname) commit=$(git rev-parse --short HEAD)"
       nvidia-smi --query-gpu=name,memory.used,utilization.gpu,temperature.gpu --format=csv,noheader
       df -h / | tail -1; free -m | sed -n 2p; echo "--- last log lines"; tail -n 25 "$LOG"
     } > results/status.txt 2>/dev/null
-    aws s3 sync --only-show-errors results/ "$S3/results/" --exclude "*.tmp" || echo "$(date -Is) WARN: S3 sync failed" >> "$LOG"
+    aws s3 sync --only-show-errors results/ "$S3/results/" --exclude "*.tmp" --exclude ".stage" || echo "$(date -Is) WARN: S3 sync failed" >> "$LOG"
   ) || true
 }
+# The stage is kept in results/.stage because sync_loop runs in a background subshell that would otherwise
+# report the stage it was forked in.
 sync_loop() { while sleep "$SYNC_EVERY"; do push; done; }
 
 finish() {
@@ -55,7 +57,7 @@ finish() {
     stage DONE
     aws s3 cp --only-show-errors results/status.txt "$S3/DONE" && sudo shutdown -h +2   # power off only if DONE is in S3
   else
-    STAGE="FAILED (exit $rc at ${STAGE:-?})"; echo "=== $(date -Is) $STAGE" >> "$LOG"; push
+    STAGE="FAILED (exit $rc at ${STAGE:-?})"; echo "$STAGE" > results/.stage; echo "=== $(date -Is) $STAGE" >> "$LOG"; push
     aws s3 cp --only-show-errors results/status.txt "$S3/FAILED-$(date -u +%Y%m%dT%H%M%SZ)"  # one marker per failed attempt
   fi
 }

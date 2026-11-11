@@ -1651,6 +1651,27 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Checkpoints and S3:** the trainer resumes only from a checkpoint with `trainer_state.json`, which is written after the weights and optimizer, so a checkpoint uploaded mid-save is skipped. As decided in #63, a resumed cell's timing and energy are not used as official RQ3 values.
 - **Next:** step B, the pre-flight run on one g5.xlarge (needs the user's go).
 
+### 103. Pre-flight step B on one g5.xlarge: every check passed; evaluation at chunks of 5 is too slow for the budget ⚠️❓
+**2026-11-11.** One g5.xlarge (A10G, eu-central-1c) from commit `dcfc6d3`, 15:11–21:48 UTC (~10.6 h incl. setup, ≈ $13 of credit; estimate was 3–4 h). Launched after 3 capacity retries (6 min). Instance terminated afterwards. Not an official result.
+
+- **Checks (all passed):**
+  1. `e2e_check.sh` at 4, 8 and 16 bits: killed after the first complete checkpoint, resumed from `checkpoint-5`, 32 global steps, adapters, generation on all three benchmarks, scoring.
+  2. Dry training, 30 steps on the full data (s/step; #46 in brackets): **M1 15.9** (14.6 on an A10), **M4 18.0** (17.8, M6 on an A10G), **M7 13.2** (13.1, M9 on an A10G). Peak VRAM allocated 7.3 / 10.2 / 14.8 GiB. Training estimates stand.
+  3. `evaluate_all.sh` with `EVAL_LIMIT=3` on M0 and three e2e adapters (as M1/M4/M7): 24 prediction files, 12 score files; a second run made no generation calls (resume works).
+  4. M0, full HumanEval-Java, T = 0.2, chunks of 5: **7,492 s**, 96.9 tokens/s, peak 16.6 GiB reserved, 0 outputs at max_new_tokens. pass@1 63.8%, pass@10 82.6% (pilot with descriptions, #93: 65.0%, within sampling noise). The pilot (chunks of 10, A10) generated the same number of tokens in 5,015 s: **1.49× slower**.
+  5. S3 restore of a deleted file: OK. `DONE` marker written, instance powered off as designed.
+- **Small issues found:** the status file showed the stage at which the background sync started (`restore`), not the current one. Fixed: the stage is kept in `results/.stage` (`scripts/card_job.sh`). The pass@1 line in `preflight.sh`'s summary was empty (the scores are nested per benchmark); the scores file itself is correct.
+- ⚠️ **Finding: evaluation time.** Tokens/s at chunks of 5 on the A10G (pre-flight, 3 prompts per benchmark; #97 worst-case grid at chunks of 5 / 10 in brackets): M0 ~100 (90 / 128), 4-bit ~43 (59 / 108), 8-bit ~25 (25 / 48), 16-bit adapters ~60 (74 / 105). Chunks of 5 cost the quantized models ~1.8–1.9× (16-bit ~1.4×). The flat "~13 h per model" in #102 was too low:
+
+  | Scenario | Card A | Card B | Total |
+  |---|---|---|---|
+  | Chunks of 5 everywhere (#101), grid throughput | ~404 h (17 d) | ~267 h (11 d) | ~670 GPU-h ≈ $845 |
+  | Same, pre-flight throughput ratios | ~454 h (19 d) | ~341 h (14 d) | ~800 GPU-h ≈ $1,000 |
+  | Chunks of 10 except the 16-bit adapters | ~285 h (12 d) | ~219 h (9 d) | ~505 GPU-h ≈ $635 |
+
+  Assumptions: token volumes from the M0 and M2 pilots, T = 0.8 runs 10% longer, `_final` evaluated for every cell (the pilots' best epoch was 1), 3 min model load per step. Credit left ≈ $615; 14 days to the ~25 Nov target. With chunks of 5 everywhere, the campaign fits neither.
+- ❓ **For the user (nothing decided):** revisit decision 2 of #101. Proposal: chunks of 10 for M0 and the 4-/8-bit models (none OOM at 10 in #97), chunks of 5 only for the 16-bit adapters; rebalance the cards so the slow 8-bit models are split between A and B. Sampling (n = 20, T = 0.2 / 0.8) and the RQ3 batch-size-1 latency probe are unaffected; whole-run generation throughput would then not be comparable across chunk sizes and would not be used for RQ3. Even then the campaign uses about all the credit, so a fallback for a credit shortfall is needed.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1664,7 +1685,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
-11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); user to ask during the AWS student programme onboarding (#80); RunPod RTX 4090 is the user's leaning (#62). Modal removed from the study; AWS or RunPod only (#98). AWS quota granted 2026-11-10 (8 vCPUs); smoke test passed on a g5.xlarge (A10G) after capacity retries (#99); g5.xlarge vs g5.2xlarge ❓
+11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); user to ask during the AWS student programme onboarding (#80); RunPod RTX 4090 is the user's leaning (#62). Modal removed from the study; AWS or RunPod only (#98). AWS quota granted 2026-11-10 (8 vCPUs); smoke test passed on a g5.xlarge (A10G) after capacity retries (#99); two g5.xlarge, chunks of 5, AWS only (#101); chunk size re-opened after the pre-flight (#103) ❓
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.
