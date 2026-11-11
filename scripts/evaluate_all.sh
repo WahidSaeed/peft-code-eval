@@ -10,6 +10,7 @@
 # M0 is the untuned base model, zero-shot (research decision, RESEARCH_LOG #27).
 # HumanEval-Java needs JDK 8: export HEJ_JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
 # Optional: MAX_VRAM_GIB=24 caps PyTorch GPU memory (same value as for training)
+# Pre-flight only: EVAL_LIMIT=N evaluates the first N records per benchmark (never set for official runs)
 set -euo pipefail
 [[ -n "${HEJ_JAVA_HOME:-}" ]] || { echo "set HEJ_JAVA_HOME to a JDK 8 (HumanEval-Java)"; exit 1; }
 (( BASH_VERSINFO[0] >= 4 )) || { echo "needs bash >= 4 (associative arrays)"; exit 1; }
@@ -30,7 +31,8 @@ gen() {  # gen <run_name> <prediction suffix> <evaluator args...>: skips if the 
   if [[ -s "results/predictions/${name}_${suffix}.jsonl" ]]; then
     echo "== $name: $suffix predictions exist, skipping"; return 0
   fi
-  python src/evaluator.py "$@" --run_name "$name" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"}
+  python src/evaluator.py "$@" --run_name "$name" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} \
+    ${EVAL_LIMIT:+--limit "$EVAL_LIMIT"}   # EVAL_LIMIT: pre-flight only (first N records per benchmark)
 }
 
 score_tests() {  # score_tests <run_name> [prediction suffixes]: unit tests → results/scores/<run_name>_tests.json

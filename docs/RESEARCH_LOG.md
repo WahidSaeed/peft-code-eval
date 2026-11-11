@@ -1625,6 +1625,32 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   - `scripts/evaluate_all.sh`: resume. Each generation step is skipped if its prediction file exists, and each scoring step if its score file exists (scores also go through a temporary file).
   - **Test:** a bash 5 container (python:3.11-slim) with stub `evaluator.py`/`execution.py`, M0 + M2 (best epoch 1, so `M2_final` too). Run 1 crashed at `M2_t08` HumanEval-Java (simulated) after 14 steps; run 2 resumed at exactly that step and finished; run 3 made no calls. 15 prediction files and 7 score files in the end.
 
+### 102. Pre-flight step A: campaign tooling for two g5.xlarge on AWS ✅
+**2026-11-11.** Code and AWS set-up without a GPU, as approved in #101. Account-level names (bucket, ARNs) are in the private ops log.
+
+- **AWS resources (free):** a private results bucket in eu-central-1 (public access blocked, **versioning on**, so nothing synced can be lost by an overwrite), and an IAM role + instance profile `thesis-gpu-runner` that may only list/read/write that bucket, plus `AmazonSSMManagedInstanceCore` for Session Manager (debugging without SSH keys or open ports). The five data files and their SHA-256 sums are in the bucket. The training file's hash (`f815368d…`) matches the one recorded in the pilot runs, so the official runs train on exactly the pilot data.
+- **Cell split between the two cards**, balanced on estimated GPU-hours per model (training: 4-bit ~13.9 h from the 18k pilot, 8-bit ~17 h and 16-bit ~12.5 h scaled from the #46 step times; evaluation ~13 h per model with chunks of 5, to be re-measured in step B). Each card evaluates the models it trains, so no adapters move between instances:
+
+  | Card | Trains | Evaluates | Est. GPU-h |
+  |---|---|---|---|
+  | A | M4 M5 M6 M7 M9, seeds 43/44 of M5 | M0 M4 M5 M6 M7 M9 M5_s43 M5_s44 | ~210 |
+  | B | M1 M2 M3 M8, seeds 43/44 of M2 and M8 | M1 M2 M3 M8 M2_s43 M2_s44 M8_s43 M8_s44 | ~211 |
+
+  Every card runs one bit-width completely plus part of the 16-bit cells. Both cards are the same instance type (#101), so mixing within a bit-width is not a hardware confound.
+- **New scripts:**
+  - `scripts/aws_launch.sh` (local): launches one card (g5.xlarge, the pinned DLAMI, 150 GB gp3, the instance profile, IMDSv2, shutdown = stop) and retries every 2 min on `InsufficientInstanceCapacity` only. It refuses a commit that is not on `origin/main`. The user data clones the repo at that commit, runs `setup_gpu_vm.sh` and starts `card_job.sh` in tmux.
+  - `scripts/card_job.sh` (VM): restores the card's results from S3 (a relaunched instance resumes), fetches and checksums the data, trains (`run_matrix.sh`, then seeds 43/44), evaluates (`evaluate_all.sh`), syncs `results/` to S3 every 10 min and at every stage, and writes `status.txt` for monitoring. On success: a `DONE` marker in S3, then power-off. On failure: a `FAILED-<time>` marker, and the instance stays up for debugging. Nothing is deleted locally or in S3.
+  - `scripts/preflight.sh` (VM, via `card_job.sh` with `PREFLIGHT=1`): the step B checks (see #100).
+  - `scripts/credit_check.sh` (local): credit applied per day (Cost Explorer), running thesis instances with uptime, estimated credit left, and a warning under $100.
+  - `scripts/e2e_check.sh` now takes `E2E_BITS` (4/8/16); `scripts/evaluate_all.sh` takes `EVAL_LIMIT` (pre-flight only).
+- **Tests (bash 5 container, stub training/evaluation and a fake S3):**
+  - Card B with training failing in the seed stage: exit 3, a `FAILED` marker with the stage name, and the finished cells in S3.
+  - Relaunch on an empty disk: M1/M2 restored from S3, the remaining stages ran, `DONE` written, then power-off.
+  - **Bug found and fixed:** the status/sync helper ran under `set -e`, so any failing monitoring command (e.g. a missing `free`) would have killed the campaign job, and the failure handler would then have died the same way without writing a marker. The helper now runs in a subshell that can never fail the job.
+  - `credit_check.sh` ran against the account (Cost Explorer shows only $0.31 for 10 Nov so far; it lags by about a day).
+- **Checkpoints and S3:** the trainer resumes only from a checkpoint with `trainer_state.json`, which is written after the weights and optimizer, so a checkpoint uploaded mid-save is skipped. As decided in #63, a resumed cell's timing and energy are not used as official RQ3 values.
+- **Next:** step B, the pre-flight run on one g5.xlarge (needs the user's go).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user

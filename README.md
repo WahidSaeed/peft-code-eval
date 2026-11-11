@@ -75,6 +75,7 @@ docs/
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt          # install the CUDA build of torch on GPU hosts
 # Official GPU runs: bash scripts/setup_gpu_vm.sh (Python 3.11 venv via uv, pinned requirements.lock.txt)
+# On AWS: scripts/aws_launch.sh starts one card (scripts/card_job.sh) with S3 sync and resume (RESEARCH_LOG #102)
 
 # 1. HumanEval-Java source (BSD-3), pinned commit
 git clone https://github.com/lin-tan/clm data/clm && git -C data/clm checkout 662769e515cfd2a4980d7d4e98f4739ef6265b45
