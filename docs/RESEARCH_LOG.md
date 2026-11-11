@@ -33,10 +33,10 @@ Conventions: ✅ done · 🔄 in progress · ⏳ waiting on external party · �
 | Novelty check + positioning table | ✅ | No prior bit-width × rank study for APR found (#29) |
 | LinkedIn posts 1–3 + GIFs | ✅ drafts | kept outside this repo |
 | Learning path | ✅ | `docs/LEARNING_PATH.md` |
-| RunPod fallback (RTX 4090, $0.90/h) | 📋 backlog | Only if AWS denies the appeal (#23) |
+| RunPod fallback (RTX 4090, $0.90/h) | ✖ dropped | AWS only for the official runs (#101) |
 | Training recipe for the official runs (overfitting) | ✅ | 3 epochs, primary = epoch with the lowest validation loss, epoch 3 secondary (#91) |
 | Megadiff token cap 1,024 (~25.7k training pairs) | 📋 backlog | Counted only; revisit after the 18k M2 pilot (#79) |
-| Generation chunk size for the official evaluation (OOM risk) | 📋 backlog ⚠️ | Chunks of 10 ran out of memory for 16-bit adapters on HumanEval-Java; chunks of 5 fit (#97) |
+| Generation chunk size for the official evaluation (OOM risk) | ✅ | Chunks of 5 for all models (#97, #101) |
 | Public GitHub repo | ✅ | https://github.com/WahidSaeed/peft-code-eval (#18) |
 
 ---
@@ -1612,6 +1612,13 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Proposed pre-flight (for the user to approve):** (A) code fixes without a GPU: resume in `evaluate_all.sh`, S3 sync + instance role, a launcher script, the cell split between two cards, the chunk-size decision. (B) A ~3–4 GPU-h run on one g5.xlarge from `main`: `setup_gpu_vm.sh` as is; a `DRY_RUN` of one cell per bit-width; `evaluate_all.sh` on the dry adapters; the worst-case HumanEval-Java OOM probe at the chosen chunk size; a kill-and-resume test; an S3 sync test; one full-model evaluation timed for re-costing. (C) A go/no-go review with the user, then the official runs.
 - **Schedule:** 14 days to the ~25 Nov target. Pre-flight ≈ 1 day, campaign ≈ 8–10 days on two cards (more if chunks of 5 are chosen). Tight but feasible, if two instances can be obtained.
 
+### 101. Decisions for the official runs: two g5.xlarge, chunks of 5, AWS only ✅
+**2026-11-11, user decisions on the #100 questions:**
+1. **Two g5.xlarge in parallel** (A10G, 4 vCPU, 16 GB host RAM each), within the 8 vCPU quota. Every official run uses this instance type, so RQ3 measurements share one hardware configuration.
+2. **Chunks of 5** (`--batch_size 5`) for every model and benchmark in the official evaluation. This closes open decision 25 / #97. Sampling stays identical across models; generation takes ~1.5× longer, to be measured in the pre-flight run.
+3. **AWS only.** No platform switch mid-campaign. If an instance is lost, the work waits for AWS capacity to relaunch the same instance type, and the other card keeps running.
+4. **Pre-flight step A** (code fixes without a GPU) starts now, then step B (the test run on one g5.xlarge) and step C (go/no-go with the user).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1638,4 +1645,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 23. ~~HumanEval-Java description vs training format (Q3)~~ → keep descriptions, budget 1,024 tokens (#93). Diagnostic done: the description is worth +21 pp to M0 and +15 pp to the fine-tuned pilot. No-description variant → added as a secondary result for the primary models (#96).
 24. ~~Changed vs copied validation loss~~ → added to the official runs (#95).
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
-25. Generation chunk size for the official evaluation: keep 10 (OOM risk for 16-bit adapters on HumanEval-Java) or use 5 for all models (#97) 📋 backlog ❓
+25. ~~Generation chunk size for the official evaluation~~ → chunks of 5 for all models (#101).
