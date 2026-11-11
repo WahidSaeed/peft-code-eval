@@ -219,7 +219,9 @@ def append_csv(path, row):
         with path.open("a", newline="") as f:
             csv.DictWriter(f, fieldnames=fields).writerow(row)
         return
-    with path.open("w", newline="") as f:
+    tmp = path.with_name(path.name + ".tmp")  # atomic rewrite: a crash mid-write must not lose the existing rows
+    with tmp.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields + new_fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(old_rows + [row])
+    tmp.replace(path)

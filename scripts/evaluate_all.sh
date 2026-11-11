@@ -20,22 +20,38 @@ MODELS=("${@:-M0 M1 M2 M3 M4 M5 M6 M7 M8 M9}")
 MODELS=(${MODELS[@]})
 mkdir -p results/predictions results/scores
 
+# Resume (RESEARCH_LOG #101): evaluator.py renames its prediction file into place only after the metrics row is
+# logged, and scores are written to a temporary file first, so an existing file is always complete. A re-run after
+# a crash or a lost instance skips every finished step. Delete a file to force that step to run again.
+suffix() { [[ "$1" == humanevalfix ]] && echo humanevalfix_java || echo "$1"; }  # evaluator.py file suffix
+
+gen() {  # gen <run_name> <prediction suffix> <evaluator args...>: skips if the prediction file exists
+  local name="$1" suffix="$2"; shift 2
+  if [[ -s "results/predictions/${name}_${suffix}.jsonl" ]]; then
+    echo "== $name: $suffix predictions exist, skipping"; return 0
+  fi
+  python src/evaluator.py "$@" --run_name "$name" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"}
+}
+
 score_tests() {  # score_tests <run_name> [prediction suffixes]: unit tests → results/scores/<run_name>_tests.json
   local name="$1"; shift
   local suffixes=("${@:-humanevalfix_java humaneval_java}"); suffixes=(${suffixes[@]})
+  local out="results/scores/${name}_tests.json"
+  if [[ -s "$out" ]]; then echo "== $name: scores exist, skipping"; return 0; fi
   local files=(); for s in "${suffixes[@]}"; do files+=("results/predictions/${name}_${s}.jsonl"); done
   python src/execution.py "${files[@]}" \
-    --per_sample_out "results/scores/${name}_tests_per_sample.jsonl" > "results/scores/${name}_tests.json"
-  cat "results/scores/${name}_tests.json"
+    --per_sample_out "results/scores/${name}_tests_per_sample.jsonl" > "$out.tmp"
+  mv "$out.tmp" "$out"
+  cat "$out"
 }
 
 evaluate() {  # evaluate <run_name> <bits> <primary|secondary> [--adapter DIR]
   local name="$1" bits="$2" role="$3"; shift 3
   echo "== $name: Megadiff test ($(date -Is))"
-  python src/evaluator.py --bits "$bits" "$@" --run_name "$name" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} --benchmark megadiff --score
+  gen "$name" megadiff --bits "$bits" "$@" --benchmark megadiff --score
   for b in humanevalfix humaneval_java; do
     echo "== $name: $b, T = 0.2 ($(date -Is))"
-    python src/evaluator.py --bits "$bits" "$@" --run_name "$name" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} --benchmark "$b"
+    gen "$name" "$(suffix "$b")" --bits "$bits" "$@" --benchmark "$b"
   done
   score_tests "$name"   # pass@1 (primary metric)
   # pass@10 from a separate run at T = 0.8 (Chen et al., 2021; RESEARCH_LOG #93), primary results only.
@@ -43,16 +59,14 @@ evaluate() {  # evaluate <run_name> <bits> <primary|secondary> [--adapter DIR]
   [[ "$role" == primary ]] || return 0
   for b in humanevalfix humaneval_java; do
     echo "== ${name}_t08: $b, T = 0.8 ($(date -Is))"
-    python src/evaluator.py --bits "$bits" "$@" --run_name "${name}_t08" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} \
-      --benchmark "$b" --temperature 0.8 --latency_samples 0
+    gen "${name}_t08" "$(suffix "$b")" --bits "$bits" "$@" --benchmark "$b" --temperature 0.8 --latency_samples 0
   done
   score_tests "${name}_t08"   # pass@10 (secondary metric)
   # HumanEval-Java without the description comment (RESEARCH_LOG #96): the prompt is then exactly the Megadiff
   # training format and the format of the closest LoRA-APR papers. Secondary result, primary models only,
   # same decoding as the main run (n = 20, T = 0.2, 1,024 tokens); latency probe skipped.
   echo "== ${name}_nodesc: humaneval_java without description, T = 0.2 ($(date -Is))"
-  python src/evaluator.py --bits "$bits" "$@" --run_name "${name}_nodesc" ${MAX_VRAM_GIB:+--max_vram_gib "$MAX_VRAM_GIB"} \
-    --benchmark humaneval_java --no_description --latency_samples 0
+  gen "${name}_nodesc" humaneval_java --bits "$bits" "$@" --benchmark humaneval_java --no_description --latency_samples 0
   score_tests "${name}_nodesc" humaneval_java
 }
 

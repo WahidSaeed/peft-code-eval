@@ -197,8 +197,9 @@ def parse_args(argv=None):
     p.add_argument("--data_dir", default="data")
     p.add_argument("--output_dir", default="results/predictions")
     p.add_argument("--log_csv", default="results/eval_log.csv")
-    p.add_argument("--batch_size", type=int, default=10,
-                   help="sequences per generate() call; 20 samples are drawn as 2 x 10 (fits a 16-bit model on 24 GB)")
+    p.add_argument("--batch_size", type=int, default=5,
+                   help="sequences per generate() call; 20 samples are drawn as 4 x 5. Chunks of 10 ran out of "
+                        "memory for 16-bit adapters on worst-case HumanEval-Java prompts (RESEARCH_LOG #97, #101)")
     p.add_argument("--max_new_tokens", type=int, help=f"default per benchmark: {MAX_NEW_TOKENS}")
     p.add_argument("--n_samples", type=int, help=f"samples per prompt; 1 = greedy. Default per benchmark: {N_SAMPLES}")
     p.add_argument("--temperature", type=float, default=0.2)
@@ -251,7 +252,10 @@ def main(argv=None):
     out_dir.mkdir(parents=True, exist_ok=True)
     suffix = "humanevalfix_" + "-".join(args.languages) if args.benchmark == "humanevalfix" else args.benchmark
     pred_path = out_dir / f"{args.run_name}_{suffix}.jsonl"
-    with pred_path.open("w") as f:
+    # Written to a temporary file and renamed only after the CSV row is logged, so an existing prediction file
+    # always means a complete run with its metrics row (evaluate_all.sh skips existing files on a re-run).
+    tmp_path = pred_path.with_name(pred_path.name + ".tmp")
+    with tmp_path.open("w") as f:
         for r, preds, n in zip(records, predictions, n_tokens):
             f.write(json.dumps({**r, "predictions": preds, "generated_tokens": n, "run_name": args.run_name}) + "\n")
 
@@ -290,6 +294,7 @@ def main(argv=None):
         row.update({k: v for k, v in summary.items() if k != "n"})
 
     append_csv(args.log_csv, row)
+    tmp_path.replace(pred_path)
     print(json.dumps(row, indent=2))
     return row
 

@@ -1619,6 +1619,12 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 3. **AWS only.** No platform switch mid-campaign. If an instance is lost, the work waits for AWS capacity to relaunch the same instance type, and the other card keeps running.
 4. **Pre-flight step A** (code fixes without a GPU) starts now, then step B (the test run on one g5.xlarge) and step C (go/no-go with the user).
 
+- **Step A, part 1 (code, 2026-11-11) ✅:**
+  - `src/evaluator.py`: `--batch_size` default 10 → **5** (decision 2). Each prediction file is now written to `<file>.tmp` and renamed into place only after its metrics row is in the CSV, so an existing prediction file is always complete and has its row. A crash between the CSV append and the rename can leave a duplicate CSV row for that step on re-run; the analysis keeps the last row per (run_name, benchmark).
+  - `src/profiler.py`: `append_csv` rewrote the whole CSV in place when a new column appeared. A crash during that rewrite would have lost every earlier row (found during this review). It now writes a temporary file and renames it.
+  - `scripts/evaluate_all.sh`: resume. Each generation step is skipped if its prediction file exists, and each scoring step if its score file exists (scores also go through a temporary file).
+  - **Test:** a bash 5 container (python:3.11-slim) with stub `evaluator.py`/`execution.py`, M0 + M2 (best epoch 1, so `M2_final` too). Run 1 crashed at `M2_t08` HumanEval-Java (simulated) after 14 steps; run 2 resumed at exactly that step and finished; run 3 made no calls. 15 prediction files and 7 score files in the end.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
