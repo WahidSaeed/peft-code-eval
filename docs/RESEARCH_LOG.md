@@ -1672,6 +1672,24 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   Assumptions: token volumes from the M0 and M2 pilots, T = 0.8 runs 10% longer, `_final` evaluated for every cell (the pilots' best epoch was 1), 3 min model load per step. Credit left ≈ $615; 14 days to the ~25 Nov target. With chunks of 5 everywhere, the campaign fits neither.
 - ❓ **For the user (nothing decided):** revisit decision 2 of #101. Proposal: chunks of 10 for M0 and the 4-/8-bit models (none OOM at 10 in #97), chunks of 5 only for the 16-bit adapters; rebalance the cards so the slow 8-bit models are split between A and B. Sampling (n = 20, T = 0.2 / 0.8) and the RQ3 batch-size-1 latency probe are unaffected; whole-run generation throughput would then not be comparable across chunk sizes and would not be used for RQ3. Even then the campaign uses about all the credit, so a fallback for a credit shortfall is needed.
 
+### 104. Decisions after the pre-flight: chunks of 5 stay, on-demand, the shortfall is paid; cards rebalanced ✅
+**2026-11-12.** User decisions on the questions of #103:
+
+1. **Chunks of 5 for every model stay** (#101, decision 2), for consistency: every model is generated the same way, so whole-run generation throughput stays comparable as well. The proposal to use chunks of 10 for the models that fit is withdrawn.
+2. **No hard deadline.** The ~25 Nov target no longer binds: a scoped-down version is submitted for internal use first, and the full campaign follows without a fixed date. The binding constraint is the budget, not time.
+3. **Spot checked, not used.** The G/VT spot quota in eu-central-1 is 0 (never requested), and the user's rule of no further quota requests (#99) stands. For the record: g5.xlarge spot was $0.52–0.76/h over the last 30 days (on-demand $1.258), with an interruption rate of 15–20% per month (Spot Instance Advisor).
+4. **On-demand g5.xlarge, and the user pays the shortfall.** Estimate ~670–800 GPU-h ≈ $845–1,000 (#103) against ≈ $615 of credit (valid to 2028-01-01), so about $230–390 is charged to the account's payment method. `scripts/credit_check.sh` keeps tracking spend daily.
+- **Cards rebalanced for chunks of 5** (`scripts/card_job.sh`). The #102 split assumed a flat evaluation time per model; with the measured times, the 8-bit models cost ~67 GPU-h each (training ~17 h + evaluation ~50 h), 4-bit ~36 h, 16-bit ~30 h:
+
+  | Card | Trains | Evaluates | Est. GPU-h |
+  |---|---|---|---|
+  | A | M4 M5 M6, seeds 43/44 of M5 | M0 M4 M5 M6 M5_s43 M5_s44 | ~345 (~14 days) |
+  | B | M1 M2 M3 M7 M8 M9, seeds 43/44 of M2 and M8 | M1 M2 M3 M7 M8 M9 M2_s43 M2_s44 M8_s43 M8_s44 | ~326 (~14 days) |
+
+  Each bit-width now runs entirely on one card. Both cards are the same instance type, so the split is not a hardware confound either way.
+- Also fixed: the pass@k line in `scripts/preflight.sh`'s summary (it read the wrong level of the scores file).
+- **Next:** launch cards A and B (needs the user's go).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1685,7 +1703,7 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 8. ~~Training dataset~~ → Megadiff, ≤ 768 tokens, split by file path (#39).
 9. ~~Prompt formats~~ → HumanEval-Java with description, HumanEvalFix-Java standard (#40). Greedy for Megadiff EM (#42). ~~GPU dry run~~ → done on Modal (#46).
 10. ~~HumanEval-Java description name mismatches~~ → keep the descriptions unchanged, report the diagnostic (#53).
-11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); user to ask during the AWS student programme onboarding (#80); RunPod RTX 4090 is the user's leaning (#62). Modal removed from the study; AWS or RunPod only (#98). AWS quota granted 2026-11-10 (8 vCPUs); smoke test passed on a g5.xlarge (A10G) after capacity retries (#99); two g5.xlarge, chunks of 5, AWS only (#101); chunk size re-opened after the pre-flight (#103) ❓
+11. GPU platform for the official runs: AWS still silent on 2026-10-28 (G/VT quota 0, request open since 2026-10-20) (#72); user to ask during the AWS student programme onboarding (#80); RunPod RTX 4090 is the user's leaning (#62). Modal removed from the study; AWS or RunPod only (#98). AWS quota granted 2026-11-10 (8 vCPUs); smoke test passed on a g5.xlarge (A10G) after capacity retries (#99); two g5.xlarge, chunks of 5, AWS only (#101); after the pre-flight: chunks of 5 stay, on-demand, shortfall paid, cards rebalanced (#103, #104)
 12. ~~Professor's "journal-published dataset" requirement~~ → approved by the supervisor: Megadiff + HumanEval-Java + HumanEvalFix-Java (#61). Code4Bench not pursued.
 15. ~~Checkpoint / overfitting~~ → final checkpoint; training set = all pairs not in validation/test (~18k); M2 pilot on the larger set first (#77).
 13. References: only Q1/Q2 journals or CORE A*/A/B conferences (#70) → revised list with 4 requested exceptions ready for the supervisor's approval (user sends it) (#71) ⏳.

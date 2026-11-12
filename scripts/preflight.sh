@@ -60,7 +60,7 @@ print("PREFLIGHT timing", {k: r.get(k) for k in ("gen_duration_s", "gen_tokens_p
                                                   "hit_max_new_tokens", "batch_size", "gpu_name")})
 EOF
 python src/execution.py "$P/timing/PF_M0_chunk5_humaneval_java.jsonl" > "$P/timing_scores.json"
-say "4. M0 HumanEval-Java pass@1: $(python -c "import json;d=json.load(open('$P/timing_scores.json'));print({k:v for k,v in d.items() if 'pass' in k})")"
+say "4. M0 HumanEval-Java pass@1: $(python -c "import json;d=json.load(open('$P/timing_scores.json'));print({k:v for b in d.values() for k,v in b.items() if k.startswith('pass_at')})")"
 
 say "5. S3 restore check"
 aws s3 sync --only-show-errors results/ "s3://$RESULTS_BUCKET/$CARD-preflight/results/" --exclude "*.tmp"

@@ -22,10 +22,11 @@ S3="s3://$RESULTS_BUCKET/${CARD}${PREFLIGHT:+-preflight}"
 LOG=results/card_job.log
 mkdir -p results data
 
-# Cell assignment, balanced on estimated GPU-hours (training + evaluation per model; RESEARCH_LOG #102).
+# Cell assignment, balanced on estimated GPU-hours (training + evaluation per model; RESEARCH_LOG #102, #104).
 case "$CARD" in
-  A) CELLS=(M4 M5 M6 M7 M9); SEED_CELLS=(M5); MODELS=(M0 M4 M5 M6 M7 M9 M5_s43 M5_s44) ;;
-  B) CELLS=(M1 M2 M3 M8);    SEED_CELLS=(M2 M8); MODELS=(M1 M2 M3 M8 M2_s43 M2_s44 M8_s43 M8_s44) ;;
+  # A: every 8-bit model + M0 (~345 GPU-h); B: every 4-bit and 16-bit model (~326 GPU-h) (RESEARCH_LOG #104).
+  A) CELLS=(M4 M5 M6);          SEED_CELLS=(M5);    MODELS=(M0 M4 M5 M6 M5_s43 M5_s44) ;;
+  B) CELLS=(M1 M2 M3 M7 M8 M9); SEED_CELLS=(M2 M8); MODELS=(M1 M2 M3 M7 M8 M9 M2_s43 M2_s44 M8_s43 M8_s44) ;;
   *) echo "unknown CARD $CARD"; exit 2 ;;
 esac
 
