@@ -1690,6 +1690,18 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - Also fixed: the pass@k line in `scripts/preflight.sh`'s summary (it read the wrong level of the scores file).
 - **Next:** launch cards A and B (needs the user's go).
 
+### 105. Card A day 1: M4 trained; an 8-bit log warning filled S3 with log versions (fixed) ✅
+**2026-11-13.** Card A (one g5.xlarge, commit `017b71a`) launched 2026-11-12 15:11 UTC on the first try; setup took ~4 min. Card B not started yet (user: one card for now).
+
+- **M4 (8-bit r8) trained:** 3,396 global steps (18,106 pairs × 3 epochs / 16) in 60,470 s (**16.8 h**, 0.898 samples/s), peak VRAM 10.24 GiB allocated, 4.10 kWh (NVML energy counter), not resumed, so its timing and energy are valid RQ3 values. Validation loss per epoch 0.0826 / 0.0851 / 0.0967 → **best epoch 1** (as in the pilots, #91), so `M4_final` is evaluated too. M5 at step 1,403/3,396 on 2026-11-13 15:28 UTC (17.4 s/step).
+- **Credit:** ≈ $576 left by `credit_check.sh` (Cost Explorer lags ~1 day).
+- ⚠️ **Problem found:** bitsandbytes prints `MatMul8bitLt: inputs will be cast from … to float16 during quantization` on nearly every 8-bit forward pass. After one day `card_job.log` was **758 MB**, and because the bucket is versioned and the log is synced every 10 min, S3 held **145 versions (54 GB)**. Over card A's ~14 days this would grow to several TB (~$100–250 per month of storage). It also made `status.txt` useless (its last log lines were all this warning).
+- **Fixes (user approved):**
+  1. **Bucket lifecycle rule:** noncurrent versions of `A/results/card_job.log` and `B/results/card_job.log` expire 1 day after being replaced. Nothing else in the bucket is affected. No information is lost: the log is append-only, so every old version is a prefix of the current one.
+  2. **Code (`src/trainer.py`, also imported by `src/evaluator.py`):** that one warning is filtered (`warnings.filterwarnings`). The cast itself is expected bitsandbytes behaviour and is unchanged; only the message is dropped. Checked that the filter survives `warnings.catch_warnings` blocks and that other warnings still print; no GPU test (the change affects logging only).
+  3. **Card A is not changed:** it keeps running on `017b71a`, so all its 8-bit runs log the same way. If card A is ever relaunched, it would pick up the filter; logging volume is the only difference.
+- **Monitoring fix:** the local watcher went blind for part of the night when the `aws login` session expired (every call failed and was read as "no change"). It now checks the session first and alerts when it expires.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user

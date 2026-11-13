@@ -19,6 +19,7 @@ import json
 import platform
 import sys
 import time
+import warnings
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
@@ -39,6 +40,12 @@ from transformers import (
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from data_loader import DEFAULT_MODEL, IGNORE_INDEX, tokenize_for_training  # noqa: E402
 from profiler import GPUProfiler, append_csv, cap_vram, trainable_parameters  # noqa: E402
+
+# bitsandbytes warns "MatMul8bitLt: inputs will be cast from ... to float16 during quantization" on nearly every
+# 8-bit forward pass (the once-per-location rule is reset by warnings.catch_warnings elsewhere in the stack), which made
+# one day of 8-bit training write ~760 MB of log (RESEARCH_LOG #105). The cast itself is expected; only the message is
+# dropped. src/evaluator.py imports this module, so generation is covered too.
+warnings.filterwarnings("ignore", message="MatMul8bitLt: inputs will be cast")
 
 # "All linear" layers of a LLaMA-style decoder (DeepSeek-Coder): attention + MLP
 TARGET_MODULES = ["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"]
