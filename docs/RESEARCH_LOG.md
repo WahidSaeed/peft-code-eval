@@ -1702,6 +1702,32 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
   3. **Card A is not changed:** it keeps running on `017b71a`, so all its 8-bit runs log the same way. If card A is ever relaunched, it would pick up the filter; logging volume is the only difference.
 - **Monitoring fix:** the local watcher went blind for part of the night when the `aws login` session expired (every call failed and was read as "no change"). It now checks the session first and alerts when it expires.
 
+### 106. Card A: all three 8-bit cells trained; best epoch 1 everywhere; the rise is on changed-line tokens only ✅
+**2026-11-14.** Card A moved to `training seeds 43 44: M5` at ~18:40 UTC (M5_s43 started). No failures, no resumes.
+
+- **Training (all 3,396 steps, not resumed, so timing and energy are valid RQ3 values):**
+
+  | Cell | samples/s | ≈ time | Peak VRAM (alloc.) | Energy | Val. loss ep. 1 / 2 / 3 | Best |
+  |---|---|---|---|---|---|---|
+  | M4 8-bit r8 | 0.898 | 16.8 h | 10.24 GiB | 4.10 kWh | 0.0826 / 0.0851 / 0.0967 | 1 |
+  | M5 8-bit r16 | 0.898 | 16.8 h | 10.41 GiB | 4.09 kWh | 0.0825 / 0.0861 / 0.1037 | 1 |
+  | M6 8-bit r32 | 0.897 | 16.8 h | 10.55 GiB | 4.09 kWh | 0.0830 / 0.0886 / 0.1143 | 1 |
+
+  Throughput is the same at every rank (as in the pilots, #97: rank barely changes step time); M6 matches its pilot (17.8 s/step).
+- **Changed vs copied validation loss (#95), per epoch:**
+
+  | Cell | Changed-line tokens | Copied-line tokens |
+  |---|---|---|
+  | M4 | 0.405 / 0.419 / 0.479 | 0.0075 / 0.0072 / 0.0075 |
+  | M5 | 0.404 / 0.425 / 0.515 | 0.0075 / 0.0071 / 0.0075 |
+  | M6 | 0.405 / 0.437 / 0.573 | 0.0078 / 0.0072 / 0.0072 |
+
+  - The whole rise after epoch 1 is on the changed-line (edit) tokens; copying is flat. This answers the open question of #95: the model grows overconfident about the edits, it does not lose the ability to copy.
+  - Higher rank overfits faster by epoch 3 (0.479 → 0.515 → 0.573); at epoch 1 the three ranks are equal. One seed each so far; the M5 seeds will show the spread.
+  - Whether epoch 1 beats M0 on the test-based metrics is still open (the pilots' epoch-3 adapters were below M0, #90); card A evaluates after the seed runs.
+- **S3 log versions:** the lifecycle rule (#105) works: versions older than ~1 day are gone. Because card A uploads the whole log (~0.8 GB) every 10 min, about 200 GB of old versions remain at any time (≈ $0.15/day).
+- **Credit:** ≈ $545–557 left (Cost Explorer: $59.06 applied 11-10 to 11-14, with ~1 day lag; card A up 47.6 h at the check).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
