@@ -1728,6 +1728,15 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **S3 log versions:** the lifecycle rule (#105) works: versions older than ~1 day are gone. Because card A uploads the whole log (~0.8 GB) every 10 min, about 200 GB of old versions remain at any time (≈ $0.15/day).
 - **Credit:** ≈ $545–557 left (Cost Explorer: $59.06 applied 11-10 to 11-14, with ~1 day lag; card A up 47.6 h at the check).
 
+### 107. Card A: M5 seed 43 trained; status at the end of the 2026-11-15 session ✅
+**2026-11-15.** No failures and no resumes so far on card A.
+
+- **M5_s43 (8-bit r16, seed 43):** 3,396 steps in ~16.8 h (16:48:58, 17.8 s/step). Validation loss 0.0827 / 0.0866 / 0.1033 → **best epoch 1** (seed 42: 0.0825 / 0.0861 / 0.1037). Changed-line loss 0.406 / 0.429 / 0.514, copied-line loss 0.0073 / 0.0068 / 0.0074 (seed 42: 0.404 / 0.425 / 0.515 and 0.0075 / 0.0071 / 0.0075). The seed changes the validation loss by ≤ 0.0005, far below the rank effect at epoch 3 in #106 (0.097 → 0.104 → 0.114).
+- **State at 13:52 UTC:** M5_s44 (the last training run on card A) has started; ~17 h, so training ends ~2026-11-16 07:00 UTC. Then `evaluate_all.sh` for M0, M4, M5, M6, M5_s43, M5_s44 (~260 GPU-h at chunks of 5, #104); card A should finish ~2026-11-27.
+- **Card B:** not started (user: one card for now). It will launch from the current HEAD, which includes the 8-bit warning filter (#105).
+- **Monitoring:** the `aws login` session lasts only a few hours, so local monitoring has gaps. Card A doesn't depend on it (instance role); a failure leaves a `FAILED-<time>` marker in S3 and keeps the instance running.
+- **When card A writes DONE:** it only stops the instance (by design, so the disk survives); terminate it by hand once the results are verified in S3, or the stopped volume keeps costing storage.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
