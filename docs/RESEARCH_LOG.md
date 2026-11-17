@@ -1737,6 +1737,70 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Monitoring:** the `aws login` session lasts only a few hours, so local monitoring has gaps. Card A doesn't depend on it (instance role); a failure leaves a `FAILED-<time>` marker in S3 and keeps the instance running.
 - **When card A writes DONE:** it only stops the instance (by design, so the disk survives); terminate it by hand once the results are verified in S3, or the stopped volume keeps costing storage.
 
+## 2026-11-16/17
+
+### 108. Review: is Megadiff training correct, and what the overfitting is ✅ (review; nothing decided)
+**2026-11-16/17.** The user asked whether the research is on track and whether Megadiff is trained correctly, given the overfitting.
+
+- **Training code (`src/trainer.py`, `src/data_loader.py` on `main`):** no bug found. The prompt is masked out of the loss (labels −100), the target ends with EOS, pairs over 768 tokens are dropped (never truncated), and no file path is shared between train, validation and test. The tokenizer was not run locally (no `transformers` on the Mac), so token IDs were not inspected directly.
+- **Behaviour checks (pilot predictions, Modal backup):** on the Megadiff test, exact match rises 3.1% → 9.2% and unchanged outputs (the buggy method returned as is) fall 18.1% → 2.2% (18k pilot vs M0). Generation stops on EOS (3 of 1,000 Megadiff outputs reach the 512-token cap). The seeds change validation loss by ≤ 0.0005 (#107).
+- **What the overfitting is (official M4 and M6 training histories, `trainer_state.json`):**
+
+  | Part of training | Train loss M4 (r = 8) | Train loss M6 (r = 32) |
+  |---|---|---|
+  | Steps 50–200 | 0.081 | 0.080 |
+  | Rest of epoch 1 | 0.078 | 0.078 |
+  | Epoch 2 | 0.066 | 0.054 |
+  | Epoch 3 | 0.045 | 0.022 |
+
+  - Train loss reaches ~0.08 after ~60 steps and stays flat for the rest of epoch 1; it only drops when the same pairs are seen again. Everything that generalises is learned early in epoch 1; epochs 2–3 memorise, faster at higher rank (consistent with the changed-line loss in #106).
+  - Reading: more data or a lower learning rate would probably not change this; the edits in Megadiff are mostly not predictable from the buggy method alone. The epoch-1 rule (#91) already handles it.
+- **Epoch-3 pilots became conservative on HumanEvalFix-Java** (comment-insensitive comparison with the reference fix and the buggy input):
+
+  | | M0 | Pilot 10k / 18k (epoch 3) |
+  |---|---|---|
+  | Samples equal to the reference fix | 24.0% | 44.9% / 41.0% |
+  | Samples returning the bug unchanged | 8.5% | 16.1% / 26.6% |
+  | Tasks solved by ≥ 1 of 20 samples | 123 | 104 / 94 |
+  | Tasks with pass rate exactly 0 or 1 | 84 | — / 137 |
+
+  On HumanEval-Java M0 wins mostly by rewriting the method from the description (41.5% of its samples pass with code that is not the reference fix).
+- **Risks noted for the user (no decision):**
+  1. Fine-tuning may not beat M0 on the test-based benchmarks; epoch-1 results decide this (#109).
+  2. At epoch 1 the ranks have equal validation loss (0.0826 / 0.0825 / 0.0830), so the correctness differences between cells may be small; "no difference in correctness, large difference in cost" is a valid result, but only with the statistics fixed in advance. `analysis/generate_tables.py` and the paired tests are still planned, not written.
+- **Proposals (for discussion, nothing decided):** write down the paired tests and confidence intervals before the adapter scores arrive; report the unchanged-output rate and exact-fix rate per model (free, from the prediction files); validation loss at each 200-step checkpoint inside epoch 1 (diagnostic only; checkpoints exist in S3 for M5_s44, other runs not checked).
+
+### 109. Card A: M0 evaluated, first epoch-1 predictions (M4); schedule slips to ~1 Dec ✅ (status)
+**2026-11-17 ~15:00 UTC.** Card A (`i-016b4b838a3e6b1a4`, commit `017b71a`) running, no FAILED marker; stage `evaluation: M0 M4 M5 M6 M5_s43 M5_s44`, M4 unit tests on the CPU.
+
+- **Official M0 (pass@1 / pass@10, %):**
+
+  | Run | HumanEvalFix-Java | HumanEval-Java |
+  |---|---|---|
+  | M0, T = 0.2 | 52.41 / 72.21 | 63.87 / 82.78 |
+  | M0_t08, T = 0.8 | 50.49 / 77.95 | 59.66 / 85.97 |
+  | M0_nodesc, T = 0.2 | — | 44.33 / 66.40 |
+
+  Megadiff (greedy): EM 3.2%, CodeBLEU 0.741. The pilot M0 (A10, 53.1 / 72.0 and 64.8 / 81.9) is reproduced within ~1 pp.
+- **M4 (8-bit r8, epoch 1), predictions only (unit tests pending):** Megadiff EM **8.5%**, CodeBLEU **0.871**.
+
+  | | M0 | M4 epoch 1 | Epoch-3 pilots 10k / 18k |
+  |---|---|---|---|
+  | HumanEvalFix: equal to the reference fix | 24.5% | **48.9%** | 44.9% / 41.0% |
+  | HumanEvalFix: bug returned unchanged | 7.7% | **3.9%** | 16.1% / 26.6% |
+  | HumanEvalFix: tasks with ≥ 1 reference fix | 82 | 93 | — |
+  | HumanEval-Java: equal to the reference fix | 22.4% | **35.2%** | 28.3% / 27.6% |
+  | HumanEval-Java: bug returned unchanged | 1.5% | 12.2% | 6.2% / 5.7% |
+  | HumanEval-Java: tasks with ≥ 1 reference fix | 66 | 74 | — |
+
+  - Epoch 1 no longer copies the bug back on HumanEvalFix and gives more exact fixes than both M0 and the epoch-3 pilots: early support for #91.
+  - On HumanEval-Java it gives more exact fixes than M0 but returns the bug unchanged more often (12.2% vs 1.5%); whether it beats M0 is open until the unit tests.
+  - Comparison: comments and whitespace ignored, code taken from a Markdown fence where present. Not a thesis metric yet (see #108 proposals).
+- **Evaluation speed (8-bit is slow):** M4 Megadiff 3.4 h, HumanEvalFix 7.3 h, HumanEval-Java 9.0 h (M0 HumanEvalFix: 2.4 h). Each 8-bit adapter needs ≈ 65 h of evaluation including its epoch-3 `_final` run → **card A finishes ≈ 2026-11-30 / 12-01**, not ~11-27 (#107).
+- **Credit:** ≈ $430 left (rough; Cost Explorer last checked 11-14). Card A's remaining ~13 days ≈ $400.
+- **Card B (4-bit and 16-bit cells + M2/M8 seeds) not launched** (user: one card for now). Rough estimate ≈ 450 GPU-h (≈ $570), almost all beyond the credit; every day it waits moves the end of the full study by a day. ❓ Launch date is the user's decision.
+- **M609 module:** branch `m609-memory-study` pushed to GitHub on 2026-11-17 (8 commits, log M1–M14).
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1764,3 +1828,5 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 24. ~~Changed vs copied validation loss~~ → added to the official runs (#95).
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
 25. ~~Generation chunk size for the official evaluation~~ → chunks of 5 for all models (#101).
+26. Card B launch date (4-bit and 16-bit cells): not launched; card A ends ≈ 1 Dec (#109). ❓
+27. Statistics plan (paired tests, confidence intervals) and the unchanged-output / exact-fix rates as reported metrics (#108). ❓
