@@ -121,3 +121,16 @@ User decisions on the six next steps proposed after draft 1:
 - **User decision:** Modal is no longer used for the M609 study, so no further GPU runs are planned for the paper.
 - The M10 backlog item "16-bit inference at chunks of 2" is dropped. The paper keeps the *c* ≤ 2 / 16 GB fit as an untested prediction, as worded in draft 1 (M10 item 2).
 - All paper results stay as measured (M4–M7, A10G/A10 on Modal). The Modal provenance is described as it happened.
+
+### M12. Out-of-memory claim narrowed in the draft (2026-11-16) ✅
+- The abstract, Table 5 and the conclusion said the 16-bit fine-tuned models run out of memory at *c* = 10 on a 24 GB card in general. The measurement (Table 3) shows this only on HumanEval-Java; HumanEvalFix-Java at *c* = 10 fitted (21.38–21.69 GiB reserved).
+- At the user's request, all three places now name HumanEval-Java, and Table 5 marks HumanEvalFix-Java at *c* = 10 as fitting on the A10G. No numbers changed.
+
+### M13. No reference to a larger study in the draft (2026-11-17) ✅
+- **User decision:** the paper must not present itself as a scoped-down part of a larger study.
+- §1 now says only "Repair accuracy is out of scope." (it called the study a preliminary, memory-only part of a thesis). The closing line of §6 is now ordinary future work (measure repair accuracy and energy alongside memory) instead of "the full study will add …". No results changed.
+
+### M14. Replication of the 8-bit training peaks added to the draft (2026-11-17) ✅
+- **Source:** five full-length 8-bit training runs on AWS g5.xlarge (A10G), 3 epochs / 3,396 steps on the 18,106 training pairs, same library versions (PyTorch 2.14.1, Transformers 5.20.2, PEFT 0.21.2, bitsandbytes 0.50.2): r = 8, 16, 32 at seed 42, and r = 16 at seeds 43 and 44.
+- **Peaks (allocated / reserved, GiB):** r8 10.24 / 10.94, r16 10.41 / 11.15 (all three seeds identical), r32 10.55 / 11.49. Static 7.10 / 7.17 / 7.32. Table 2 (50 typical steps on Modal): 10.24 / 10.94, 10.41 / 11.15, 10.55 / 11.47. All within 0.02 GiB.
+- **Draft change (user approved):** one bullet in §5 Internal validity: the 50-step peak also bounds full-length training and does not vary with the seed. Not framed as part of a larger study (M13).
