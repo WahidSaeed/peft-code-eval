@@ -1801,6 +1801,22 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Card B (4-bit and 16-bit cells + M2/M8 seeds) not launched** (user: one card for now). Rough estimate ≈ 450 GPU-h (≈ $570), almost all beyond the credit; every day it waits moves the end of the full study by a day. ❓ Launch date is the user's decision.
 - **M609 module:** branch `m609-memory-study` pushed to GitHub on 2026-11-17 (8 commits, log M1–M14).
 
+### 110. First fine-tuned scores: M4 (8-bit r8, epoch 1) vs M0 ✅ (results) ⚠️ one output glitch
+**2026-11-17 ~21:50 UTC.** Card A running, no FAILED marker; M4 is now generating its T = 0.8 runs.
+
+- **pass@1 / pass@10 at T = 0.2 (%):**
+
+  | Model | HumanEvalFix-Java | HumanEval-Java |
+  |---|---|---|
+  | M0 | 52.41 / 72.21 | 63.87 / 82.78 |
+  | **M4 epoch 1** | **55.91 / 62.16** | **61.01 / 71.08** |
+  | Pilot 4-bit r16 epoch 3, 10k / 18k (#90) | 57.5 / 63.1, 50.0 / 56.6 | 55.3 / 63.7, 58.2 / 65.7 |
+
+  The primary pass@10 comes from the T = 0.8 run (#93), still generating for M4; the T = 0.2 pass@10 above is lower for M4 because its 20 samples are much less diverse (2.1 distinct per task on HumanEval-Java vs 5.7 for M0).
+- **Per task (pass rate over 20 samples):** HumanEvalFix: M4 higher on 48 tasks, lower on 39, equal on 77; solved by ≥ 1 sample: M0 124, M4 104. HumanEval-Java: higher on 53, lower on 48, equal on 62; solved by ≥ 1: M0 140, M4 118. M4 is more all-or-nothing (HEF: 60 tasks at 0, 75 at 1).
+- **Reading (one cell, no test yet):** epoch 1 beats M0 on HumanEvalFix pass@1 (+3.5 pp) and the epoch-3 18k pilot (+5.9 pp); it is below M0 on HumanEval-Java pass@1 (−2.9 pp) but above both epoch-3 pilots. The paired tests (open decision 27) decide what is significant.
+- ⚠️ **Output glitch:** 132 of M4's 3,280 HumanEvalFix samples (4.0%) end the class with `}!` (an extra `!` after the closing brace, before the closing fence); 130 of them are scored as compile errors (`class, interface, or enum expected`). M0 never does this (0 / 3,280), nor does M4 on HumanEval-Java (0 / 3,260). It is the model's own output, not an extraction bug, and is scored strictly under the current rules. ❓ Like the unclosed fence (#90), whether to strip a trailing `!` after the final brace is the user's decision; nothing changed. If adopted, at most +4.0 pp on M4's HumanEvalFix pass@1.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1830,3 +1846,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 25. ~~Generation chunk size for the official evaluation~~ → chunks of 5 for all models (#101).
 26. Card B launch date (4-bit and 16-bit cells): not launched; card A ends ≈ 1 Dec (#109). ❓
 27. Statistics plan (paired tests, confidence intervals) and the unchanged-output / exact-fix rates as reported metrics (#108). ❓
+28. Trailing `}!` in M4's HumanEvalFix outputs (4.0% of samples): score strictly, or strip the `!` as with the unclosed fence (#90)? (#110) ❓
