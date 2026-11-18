@@ -1841,6 +1841,26 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Consistent with #90:** the unclosed-fence rule only takes the code out of its Markdown wrapper; the code inside is untouched and must compile as written. A `!` after the closing brace is inside the code, so it fails, exactly like any other compile error.
 - **Recorded for the analysis:** the `}!` rate per model is a fact about the outputs (M4: 4.0% of HumanEvalFix samples at T = 0.2, 7.5% at T = 0.8; M0: 0) and can be described in the error analysis; it does not change any score.
 
+### 113. Proposal: statistics plan and descriptive output measures (open decision 27) ❓ (discussion on 2026-11-19)
+**2026-11-18.** The user asked whether M4 performs better than M0. The answer was mixed: clearly better on Megadiff EM (8.5% vs 3.2%); HumanEvalFix pass@1 +3.5 pp but pass@10 −1.6 pp; HumanEval-Java −2.9 pp on both. Per task, M4 is better on 48 and worse on 39 HumanEvalFix tasks (simple sign test p ≈ 0.3) and 53 vs 48 on HumanEval-Java. One model, one seed: no claim without a statistics plan. The plan (§5, §8) only says "mean ± SD" and "paired tests over seeds and bugs"; `analysis/generate_tables.py` is still planned. **Nothing decided; the user will discuss it on 2026-11-19.**
+
+- **Part A, statistics (assistant's proposal):**
+
+  | Choice | Proposal | Reason |
+  |---|---|---|
+  | Unit of analysis | The task (164 HumanEvalFix-Java, 163 HumanEval-Java), paired between models | Same tasks for every model; pairing removes task difficulty |
+  | Effect size | Difference in pass@1 (pp) with a 95% CI from a paired bootstrap over tasks | Shows size and uncertainty, not only significance |
+  | Test, pass@k | Wilcoxon signed-rank test on per-task pass rates | Standard paired test, no distributional assumption |
+  | Test, Megadiff EM | McNemar test (paired correct/incorrect per bug) | One binary outcome per bug |
+  | Comparisons, fixed in advance | Each model vs M0; precision at fixed rank; rank at fixed precision; epoch 1 vs epoch 3 (`_final`) | No choosing comparisons after seeing results |
+  | Multiple comparisons | Holm correction within each RQ | Many comparisons produce chance "wins" |
+  | Seeds (M2, M5, M8 × 42/43/44) | Mean ± SD; a between-cell gap smaller than the seed spread is not called a difference | Seed spread is the noise floor |
+  | "No difference" claims | Report the CI (e.g. "between −2 and +3 pp"), not only "not significant" | At epoch 1 the ranks may hardly differ, so this may be a main result |
+
+- **Part B, descriptive output measures (from the saved prediction files; no GPU time, no score changes):** share of samples returning the bug unchanged; share equal to the reference fix; distinct outputs per task out of 20; share of faulty output such as `}!` (#112).
+- **Timing:** fixing the plan before most adapter scores arrive keeps every comparison pre-specified. Card A is not affected (analysis on saved files only).
+- **Next:** discuss with the user; if agreed, write `analysis/generate_tables.py` and run it on the M0 and M4 scores already in S3.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1869,5 +1889,5 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 16. Reproduce Lee et al. (IST 2026)? Full retraining not recommended; inference-only check if the authors share an adapter, otherwise related work only (#78). Adapter request sent 2026-10-27, awaiting reply ⏳. ❓
 25. ~~Generation chunk size for the official evaluation~~ → chunks of 5 for all models (#101).
 26. Card B launch date (4-bit and 16-bit cells): not launched; card A ends ≈ 1 Dec (#109). ❓
-27. Statistics plan (paired tests, confidence intervals) and the unchanged-output / exact-fix rates as reported metrics (#108). ❓
+27. Statistics plan (paired tests, confidence intervals) and the unchanged-output / exact-fix rates as reported metrics (#108); full proposal in #113, discussion planned for 2026-11-19. ❓
 28. ~~Trailing `}!` in fine-tuned outputs~~ → scored strictly as faulty output (compile error); no re-scoring (#112).
