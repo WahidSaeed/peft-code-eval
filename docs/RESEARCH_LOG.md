@@ -1817,6 +1817,22 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Reading (one cell, no test yet):** epoch 1 beats M0 on HumanEvalFix pass@1 (+3.5 pp) and the epoch-3 18k pilot (+5.9 pp); it is below M0 on HumanEval-Java pass@1 (−2.9 pp) but above both epoch-3 pilots. The paired tests (open decision 27) decide what is significant.
 - ⚠️ **Output glitch:** 132 of M4's 3,280 HumanEvalFix samples (4.0%) end the class with `}!` (an extra `!` after the closing brace, before the closing fence); 130 of them are scored as compile errors (`class, interface, or enum expected`). M0 never does this (0 / 3,280), nor does M4 on HumanEval-Java (0 / 3,260). It is the model's own output, not an extraction bug, and is scored strictly under the current rules. ❓ Like the unclosed fence (#90), whether to strip a trailing `!` after the final brace is the user's decision; nothing changed. If adopted, at most +4.0 pp on M4's HumanEvalFix pass@1.
 
+### 111. M4 epoch 1 fully evaluated; epoch-3 run (M4_final) started ✅ (results)
+**2026-11-18 ~16:40 UTC.** Card A running, no FAILED marker. All six M4 (epoch 1) evaluations are done; card A is now evaluating M4's epoch-3 adapter (`M4_final`).
+
+- **Primary results, pass@1 at T = 0.2 and pass@10 at T = 0.8 (%, #93):**
+
+  | Model | HumanEvalFix-Java pass@1 / pass@10 | HumanEval-Java pass@1 / pass@10 | HumanEval-Java, no description, pass@1 / pass@10 (T = 0.2) |
+  |---|---|---|---|
+  | M0 | 52.41 / 77.95 | 63.87 / 85.97 | 44.33 / 66.40 |
+  | **M4 epoch 1** | **55.91 / 76.35** | **61.01 / 83.10** | **47.18 / 55.76** |
+
+  - At T = 0.8 the fine-tuned model's samples are diverse again: M4's pass@10 is within 1.6 pp (HumanEvalFix) and 2.9 pp (HumanEval-Java) of M0's, against gaps of 10 and 12 pp at T = 0.2 (#110). This supports the T = 0.8 decision (#93).
+  - M4's pass@1 at T = 0.8 is 49.76 (HumanEvalFix) and 55.31 (HumanEval-Java); M0's 50.49 and 59.66.
+  - Without the description, M4 beats M0 on pass@1 (+2.9 pp) and loses on pass@10 (−10.6 pp, T = 0.2, low diversity again). The description is worth +13.8 pp of pass@1 to M4 and +19.5 pp to M0.
+- **Megadiff (greedy):** EM / CodeBLEU: M0 3.2% / 0.741; M4 epoch 1 8.5% / 0.871; **M4 epoch 3 (`M4_final`) 10.0% / 0.862**. Epoch 3 has the higher exact match on in-distribution data; whether it is worse on the test-based benchmarks (as the pilots suggest) comes with `M4_final`'s HumanEvalFix and HumanEval-Java runs.
+- **`}!` glitch (#110) at T = 0.8:** 248 of 3,280 M4 HumanEvalFix samples (7.6%) end with `}!` (4.0% at T = 0.2). Still scored strictly; open decision 28.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
