@@ -1833,6 +1833,14 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 - **Megadiff (greedy):** EM / CodeBLEU: M0 3.2% / 0.741; M4 epoch 1 8.5% / 0.871; **M4 epoch 3 (`M4_final`) 10.0% / 0.862**. Epoch 3 has the higher exact match on in-distribution data; whether it is worse on the test-based benchmarks (as the pilots suggest) comes with `M4_final`'s HumanEvalFix and HumanEval-Java runs.
 - **`}!` glitch (#110) at T = 0.8:** 248 of 3,280 M4 HumanEvalFix samples (7.6%) end with `}!` (4.0% at T = 0.2). Still scored strictly; open decision 28.
 
+### 112. Decision: `}!` outputs are scored strictly as faulty output ✅
+**2026-11-18.** On open decision 28 (#110, #111).
+
+- **User decision:** "if the output is coming from the fine-tuned model M4, that means it's the final output … it's not a glitch, it's simply a faulty output and should be treated as such." A sample ending in `}!` is the model's answer and fails to compile, so it counts as a compile error. No lenient re-scoring, no sensitivity variant.
+- **Consistent with the existing rules:** the scoring rules fixed before the campaign stay unchanged for every model and both cards. Nothing is re-scored, card A (`017b71a`) and the future card B run the same `execution.py`.
+- **Consistent with #90:** the unclosed-fence rule only takes the code out of its Markdown wrapper; the code inside is untouched and must compile as written. A `!` after the closing brace is inside the code, so it fails, exactly like any other compile error.
+- **Recorded for the analysis:** the `}!` rate per model is a fact about the outputs (M4: 4.0% of HumanEvalFix samples at T = 0.2, 7.5% at T = 0.8; M0: 0) and can be described in the error analysis; it does not change any score.
+
 ---
 
 ## Open decisions (❓) — to resolve with the user
@@ -1862,4 +1870,4 @@ Bugs in this dataset are small edits, so CodeBLEU is high even with no repair. *
 25. ~~Generation chunk size for the official evaluation~~ → chunks of 5 for all models (#101).
 26. Card B launch date (4-bit and 16-bit cells): not launched; card A ends ≈ 1 Dec (#109). ❓
 27. Statistics plan (paired tests, confidence intervals) and the unchanged-output / exact-fix rates as reported metrics (#108). ❓
-28. Trailing `}!` in M4's HumanEvalFix outputs (4.0% of samples): score strictly, or strip the `!` as with the unclosed fence (#90)? (#110) ❓
+28. ~~Trailing `}!` in fine-tuned outputs~~ → scored strictly as faulty output (compile error); no re-scoring (#112).
